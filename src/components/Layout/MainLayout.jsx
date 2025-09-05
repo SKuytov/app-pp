@@ -78,7 +78,23 @@ const MainLayout = ({ user, cart, addToCart, updateCart, clearCart, warehouseSta
       case 'dashboard':
         return <Dashboard user={user} parts={parts} lowStockParts={lowStockParts} orders={orders} suppliers={suppliers} />;
       case 'inventory':
-        return <InventoryTab user={user} addToCart={addToCart} parts={parts} filteredParts={filteredParts} searchTerm={searchTerm} setSearchTerm={setSearchTerm} selectedMainGroup={selectedMainGroup} setSelectedMainGroup={setSelectedMainGroup} selectedSubGroup={selectedSubGroup} setSelectedSubGroup={setSelectedSubGroup} mainGroups={mainGroups} subGroups={subGroups} machines={machines} onPartSubmit={apiHandlers.handlePartSubmit} movements={movements} recordPartUsage={apiHandlers.recordPartUsage} restockPart={apiHandlers.restockPart} />;
+        return <InventoryTab
+          user={user}
+          addToCart={addToCart}
+          parts={parts}
+          filteredParts={filteredParts}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          selectedMainGroup={selectedMainGroup}
+          setSelectedMainGroup={setSelectedMainGroup}
+          selectedSubGroup={selectedSubGroup}
+          setSelectedSubGroup={setSelectedSubGroup}
+          mainGroups={mainGroups}
+          subGroups={subGroups}
+          machines={machines}
+          apiHandlers={apiHandlers}
+          movements={movements}
+        />;
       case 'machines':
         return <MachinesTab user={user} warehouseState={warehouseState} apiHandlers={apiHandlers} addToCart={addToCart} />;
       case 'orders':

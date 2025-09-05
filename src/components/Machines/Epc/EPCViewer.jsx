@@ -158,20 +158,8 @@ const EPCViewer = ({ machine, parts, assemblies, hotspots, onBomUpdate, addToCar
                 x_position: -1, 
                 y_position: -1,
             };
-            const result = await onBomUpdate(hotspotData);
-            if (result && result.data) {
-                const newHotspot = result.data[0];
-                setSelectedItemToPlace({
-                    type: 'part',
-                    id: newHotspot.part_id,
-                    hotspotId: newHotspot.id,
-                    item_number: newHotspot.item_number
-                });
-                setIsEditMode(true);
-                toast({ title: "Part Added, Place it now", description: "Click on the drawing to place the new part." });
-            } else {
-                 toast({ variant: "destructive", title: "Error", description: `Failed to add item.` });
-            }
+            await onBomUpdate(hotspotData);
+            toast({ title: "Part Added", description: "The part has been added to the BOM." });
         }
     };
 
@@ -184,9 +172,7 @@ const EPCViewer = ({ machine, parts, assemblies, hotspots, onBomUpdate, addToCar
             setSelectedHotspotId(null);
         } else {
             setSelectedHotspotId(item.id);
-            if (item.x_position >= 0) {
-              setTimeout(() => setZoomToHotspot(item.id), 50);
-            }
+            setTimeout(() => setZoomToHotspot(item.id), 50);
         }
     }
 
