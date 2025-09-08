@@ -7,13 +7,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, Package, Wrench, Truck, FileText, Users, Shield, Settings, AreaChart, PieChart, Activity, Boxes, BarChart3, ChevronDown, BrainCircuit } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { 
-  LayoutDashboard, Package, Wrench, Truck, FileText, Users, Shield, Settings, 
-  AreaChart, PieChart, Activity, Boxes, BarChart3, ChevronDown, BrainCircuit,
-  Network, TrendingUp  // 🎯 ADD THESE
-} from 'lucide-react';
+import { LayoutDashboard, Package, Wrench, Truck, FileText, Users, Shield, Settings, AreaChart, PieChart, Activity, Boxes, BarChart3, ChevronDown, BrainCircuit, Network, TrendingUp } from 'lucide-react';
+
 
 const NavTabs = ({ user, activeTab, setActiveTab }) => {
   const TABS_CONFIG = {
