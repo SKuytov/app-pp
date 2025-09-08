@@ -257,7 +257,7 @@ const AdvancedBIDashboard = ({
                 ) : (
                   <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
                 )}
-                <span className={`text-sm font-medium ${{kpi.trend === 'up' ? 'text-green-600' : 'text-red-600'}}`}>
+                <span className={`text-sm font-medium ${kpi.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
                   {kpi.change}
                 </span>
                 <span className="text-sm text-gray-500 ml-1">vs last month</span>
