@@ -98,7 +98,7 @@ export const useApiHandlers = (refreshData, user) => {
     // First, get current part quantity
     const { data: currentPart, error: fetchError } = await supabase
       .from('parts')
-      .select('current_quantity')
+      .select('quantity')
       .eq('id', partId)
       .single();
 
@@ -109,17 +109,17 @@ export const useApiHandlers = (refreshData, user) => {
 
     // Check if we have enough quantity
     const usageQuantity = parseInt(quantity);
-    if (currentPart.current_quantity < usageQuantity) {
+    if (currentPart.quantity < usageQuantity) {
       toast({ 
         variant: "destructive", 
         title: "Insufficient Inventory", 
-        description: `Not enough quantity available. Current: ${currentPart.current_quantity}, Requested: ${usageQuantity}` 
+        description: `Not enough quantity available. Current: ${currentPart.quantity}, Requested: ${usageQuantity}` 
       });
       return false;
     }
 
     // Calculate new quantity
-    const newQuantity = currentPart.current_quantity - usageQuantity;
+    const newQuantity = currentPart.quantity - usageQuantity;
 
     let description = "Used part";
     if (machineId) {
@@ -156,7 +156,7 @@ export const useApiHandlers = (refreshData, user) => {
     // Update the part's current quantity
     const { error: updateError } = await supabase
       .from('parts')
-      .update({ current_quantity: newQuantity })
+      .update({quantity: newQuantity })
       .eq('id', partId);
 
     if (updateError) {
@@ -167,7 +167,7 @@ export const useApiHandlers = (refreshData, user) => {
     refreshData(['parts', 'movements']);
     toast({ 
       title: "✅ Part Used Successfully", 
-      description: `Quantity updated: ${currentPart.current_quantity} → ${newQuantity}` 
+      description: `Quantity updated: ${currentPart.quantity} → ${newQuantity}` 
     });
     return true;
 
@@ -188,7 +188,7 @@ export const useApiHandlers = (refreshData, user) => {
     // First, get current part quantity
     const { data: currentPart, error: fetchError } = await supabase
       .from('parts')
-      .select('current_quantity')
+      .select('quantity')
       .eq('id', partId)
       .single();
 
@@ -198,7 +198,7 @@ export const useApiHandlers = (refreshData, user) => {
     }
 
     // Calculate new quantity
-    const newQuantity = (currentPart.current_quantity || 0) + parseInt(quantity);
+    const newQuantity = (currentPart.quantity || 0) + parseInt(quantity);
 
     // Update part quantity and create movement record in a transaction-like approach
     const { error: movementError } = await supabase.from('part_movements').insert([{
@@ -219,7 +219,7 @@ export const useApiHandlers = (refreshData, user) => {
     // Update the part's current quantity
     const { error: updateError } = await supabase
       .from('parts')
-      .update({ current_quantity: newQuantity })
+      .update({quantity: newQuantity })
       .eq('id', partId);
 
     if (updateError) {
