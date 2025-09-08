@@ -16,6 +16,8 @@ import PredictiveMaintenance from '@/components/Analytics/PredictiveMaintenance'
 import InventoryAnalytics from '@/components/Analytics/InventoryAnalytics';
 import SupplierAnalytics from '@/components/Analytics/SupplierAnalytics';
 import { AnimatePresence, motion } from 'framer-motion';
+import AdvancedBIDashboard from '@/components/Analytics/AdvancedBIDashboard';
+import MachinePartAnalyzer from '@/components/Analytics/MachinePartRelationshipAnalyzer';
 
 const MainLayout = ({ user, cart, addToCart, updateCart, clearCart, warehouseState, apiHandlers }) => {
   const { parts, lowStockParts, orders, suppliers, machines, quotations, facilities, movements, assemblies, hotspots, loading, refreshData } = warehouseState;
@@ -119,6 +121,23 @@ const MainLayout = ({ user, cart, addToCart, updateCart, clearCart, warehouseSta
         return <SupplierAnalytics suppliers={suppliers} parts={parts} movements={movements} />;
       default:
         return null;
+      case 'advanced_analytics':
+  return <AdvancedBIDashboard 
+    parts={parts} 
+    movements={movements} 
+    machines={machines} 
+    orders={orders}
+    suppliers={suppliers}
+    facilities={facilities}
+  />;
+
+case 'relationships':
+  return <MachinePartRelationshipAnalyzer 
+    parts={parts} 
+    movements={movements} 
+    machines={machines}
+    onExport={(data) => console.log('Export:', data)}
+  />;
     }
   }
 
