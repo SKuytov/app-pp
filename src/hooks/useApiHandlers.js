@@ -34,6 +34,11 @@ export const useApiHandlers = (refreshData, user) => {
   };
 
   const handlePartSubmit = useCallback(async (partData) => {
+    if (!user?.id) {
+      toast({ variant: "destructive", title: "Error", description: "User not authenticated." });
+      return { error: new Error("User not authenticated") };
+    }
+
     const { imageFile, cadFile, ...partDetails } = partData;
     const isEditing = !!partDetails.id;
 
@@ -89,155 +94,165 @@ export const useApiHandlers = (refreshData, user) => {
   }, [handleApiResponse, refreshData]);
 
   const recordPartUsage = useCallback(async (partId, quantity, machineId) => {
-  if (!partId || !quantity || !user) {
-    toast({ variant: "destructive", title: "Error", description: "Missing information for part usage." });
-    return false;
-  }
-
-  try {
-    // First, get current part quantity
-    const { data: currentPart, error: fetchError } = await supabase
-      .from('parts')
-      .select('quantity')
-      .eq('id', partId)
-      .single();
-
-    if (fetchError) {
-      handleApiResponse({ error: fetchError, errorMessage: 'Could not fetch current part quantity.' });
+    if (!user?.id) {
+      toast({ variant: "destructive", title: "Error", description: "User not authenticated." });
       return false;
     }
 
-    // Check if we have enough quantity
-    const usageQuantity = parseInt(quantity);
-    if (currentPart.quantity < usageQuantity) {
-      toast({ 
-        variant: "destructive", 
-        title: "Insufficient Inventory", 
-        description: `Not enough quantity available. Current: ${currentPart.quantity}, Requested: ${usageQuantity}` 
-      });
+    if (!partId || !quantity) {
+      toast({ variant: "destructive", title: "Error", description: "Missing information for part usage." });
       return false;
     }
 
-    // Calculate new quantity
-    const newQuantity = currentPart.quantity - usageQuantity;
-
-    let description = "Used part";
-    if (machineId) {
-      const { data: machine, error: machineError } = await supabase
-        .from('machines')
-        .select('name')
-        .eq('id', machineId)
+    try {
+      // First, get current part quantity
+      const { data: currentPart, error: fetchError } = await supabase
+        .from('parts')
+        .select('quantity')
+        .eq('id', partId)
         .single();
 
-      if (machineError) {
-        handleApiResponse({ error: machineError, errorMessage: 'Could not fetch machine name.' });
+      if (fetchError) {
+        handleApiResponse({ error: fetchError, errorMessage: 'Could not fetch current part quantity.' });
         return false;
       }
-      description = `Used on ${machine.name}`;
-    }
 
-    // Create movement record
-    const { error: movementError } = await supabase.from('part_movements').insert([{
-      part_id: partId,
-      user_id: user.id,
-      user_name: user.username,
-      machine_id: machineId || null,
-      type: 'OUT',
-      quantity: usageQuantity,
-      description: description,
-      timestamp: new Date().toISOString(),
-    }]);
+      // Check if we have enough quantity
+      const usageQuantity = parseInt(quantity);
+      if (currentPart.quantity < usageQuantity) {
+        toast({ 
+          variant: "destructive", 
+          title: "Insufficient Inventory", 
+          description: `Not enough quantity available. Current: ${currentPart.quantity}, Requested: ${usageQuantity}` 
+        });
+        return false;
+      }
 
-    if (movementError) {
-      handleApiResponse({ error: movementError, errorMessage: "Error recording part movement." });
+      // Calculate new quantity
+      const newQuantity = currentPart.quantity - usageQuantity;
+
+      let description = "Used part";
+      if (machineId) {
+        const { data: machine, error: machineError } = await supabase
+          .from('machines')
+          .select('name')
+          .eq('id', machineId)
+          .single();
+
+        if (machineError) {
+          handleApiResponse({ error: machineError, errorMessage: 'Could not fetch machine name.' });
+          return false;
+        }
+        description = `Used on ${machine.name}`;
+      }
+
+      // Create movement record
+      const { error: movementError } = await supabase.from('part_movements').insert([{
+        part_id: partId,
+        user_id: user.id,
+        user_name: user.username || user.email || 'Unknown User',
+        machine_id: machineId || null,
+        type: 'OUT',
+        quantity: usageQuantity,
+        description: description,
+        timestamp: new Date().toISOString(),
+      }]);
+
+      if (movementError) {
+        handleApiResponse({ error: movementError, errorMessage: "Error recording part movement." });
+        return false;
+      }
+
+      // Update the part's current quantity
+      const { error: updateError } = await supabase
+        .from('parts')
+        .update({ quantity: newQuantity })
+        .eq('id', partId);
+
+      if (updateError) {
+        handleApiResponse({ error: updateError, errorMessage: "Error updating part quantity." });
+        return false;
+      }
+
+      refreshData(['parts', 'movements']);
+      toast({ 
+        title: "✅ Part Used Successfully", 
+        description: `Quantity updated: ${currentPart.quantity} → ${newQuantity}` 
+      });
+      return true;
+
+    } catch (error) {
+      handleApiResponse({ error, errorMessage: "Error recording part usage." });
       return false;
     }
-
-    // Update the part's current quantity
-    const { error: updateError } = await supabase
-      .from('parts')
-      .update({quantity: newQuantity })
-      .eq('id', partId);
-
-    if (updateError) {
-      handleApiResponse({ error: updateError, errorMessage: "Error updating part quantity." });
-      return false;
-    }
-
-    refreshData(['parts', 'movements']);
-    toast({ 
-      title: "✅ Part Used Successfully", 
-      description: `Quantity updated: ${currentPart.quantity} → ${newQuantity}` 
-    });
-    return true;
-
-  } catch (error) {
-    handleApiResponse({ error, errorMessage: "Error recording part usage." });
-    return false;
-  }
-}, [handleApiResponse, refreshData, user, toast]);
-
+  }, [handleApiResponse, refreshData, user, toast]);
 
   const restockPart = useCallback(async (partId, quantity) => {
-  if (!partId || !quantity || !user) {
-    toast({ variant: "destructive", title: "Error", description: "Missing information for restock." });
-    return;
-  }
-
-  try {
-    // First, get current part quantity
-    const { data: currentPart, error: fetchError } = await supabase
-      .from('parts')
-      .select('quantity')
-      .eq('id', partId)
-      .single();
-
-    if (fetchError) {
-      handleApiResponse({ error: fetchError, errorMessage: "Error fetching current part data." });
+    if (!user?.id) {
+      toast({ variant: "destructive", title: "Error", description: "User not authenticated." });
       return;
     }
 
-    // Calculate new quantity
-    const newQuantity = (currentPart.quantity || 0) + parseInt(quantity);
-
-    // Update part quantity and create movement record in a transaction-like approach
-    const { error: movementError } = await supabase.from('part_movements').insert([{
-      part_id: partId,
-      user_id: user.id,
-      user_name: user.username,
-      type: 'IN',
-      quantity: parseInt(quantity),
-      description: 'Manual restock',
-      timestamp: new Date().toISOString(),
-    }]);
-
-    if (movementError) {
-      handleApiResponse({ error: movementError, errorMessage: "Error creating movement record." });
+    if (!partId || !quantity) {
+      toast({ variant: "destructive", title: "Error", description: "Missing information for restock." });
       return;
     }
 
-    // Update the part's current quantity
-    const { error: updateError } = await supabase
-      .from('parts')
-      .update({quantity: newQuantity })
-      .eq('id', partId);
+    try {
+      // First, get current part quantity
+      const { data: currentPart, error: fetchError } = await supabase
+        .from('parts')
+        .select('quantity')
+        .eq('id', partId)
+        .single();
 
-    if (updateError) {
-      handleApiResponse({ error: updateError, errorMessage: "Error updating part quantity." });
-      return;
+      if (fetchError) {
+        handleApiResponse({ error: fetchError, errorMessage: "Error fetching current part data." });
+        return;
+      }
+
+      // Calculate new quantity
+      const newQuantity = (currentPart.quantity || 0) + parseInt(quantity);
+
+      // Create movement record first
+      const { error: movementError } = await supabase.from('part_movements').insert([{
+        part_id: partId,
+        user_id: user.id,
+        user_name: user.username || user.email || 'Unknown User',
+        type: 'IN',
+        quantity: parseInt(quantity),
+        description: 'Manual restock',
+        timestamp: new Date().toISOString(),
+      }]);
+
+      if (movementError) {
+        handleApiResponse({ error: movementError, errorMessage: "Error creating movement record." });
+        return;
+      }
+
+      // Update the part's current quantity
+      const { error: updateError } = await supabase
+        .from('parts')
+        .update({ quantity: newQuantity })
+        .eq('id', partId);
+
+      if (updateError) {
+        handleApiResponse({ error: updateError, errorMessage: "Error updating part quantity." });
+        return;
+      }
+
+      handleApiResponse({ 
+        successMessage: `Part restocked successfully. New quantity: ${newQuantity}`,
+        errorMessage: null 
+      });
+      refreshData(['parts', 'movements']);
+
+    } catch (error) {
+      handleApiResponse({ error, errorMessage: "Error restocking part." });
     }
+  }, [handleApiResponse, refreshData, toast, user]);
 
-    handleApiResponse({ 
-      successMessage: `Part restocked successfully. New quantity: ${newQuantity}`,
-      errorMessage: null 
-    });
-    refreshData(['parts', 'movements']);
-
-  } catch (error) {
-    handleApiResponse({ error, errorMessage: "Error restocking part." });
-  }
-}, [handleApiResponse, refreshData, toast, user]);
-
+  // ... rest of the functions remain the same
   const handleMachineSubmit = useCallback(async ({ machineData, assembliesData }) => {
     const isEditing = !!machineData.id;
     let machineResult;
@@ -320,7 +335,6 @@ export const useApiHandlers = (refreshData, user) => {
 
   const handleBomUpdate = useCallback(async (hotspotData) => {
     let response;
-    // The `_delete` property is a flag to signify deletion.
     if (hotspotData._delete) {
         if (!hotspotData.id) {
             return handleApiResponse({ error: { message: "No ID provided for deletion." }, errorMessage: "Failed to update BOM."});
@@ -338,7 +352,6 @@ export const useApiHandlers = (refreshData, user) => {
       return handleApiResponse({ error, errorMessage: "Failed to update BOM." });
     }
     
-    // Always refresh hotspots after any successful BOM update.
     refreshData(['hotspots']);
     return { data, error: null };
   }, [refreshData, handleApiResponse]);
