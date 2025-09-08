@@ -21,10 +21,6 @@ const NavTabs = ({ user, activeTab, setActiveTab }) => {
   };
 
   const ANALYTICS_TABS_CONFIG = {
-    next_level_bi: { 
-    label: 'Next-Level BI', 
-    icon: BrainCircuit, 
-    roles: ['ceo', 'admin', 'technical_director'] },
     executive_dashboard: { label: 'Executive', icon: AreaChart, roles: ['ceo', 'admin'] },
     financial_analytics: { label: 'Financial', icon: PieChart, roles: ['ceo', 'admin'] },
     predictive_maintenance: { label: 'Predictive', icon: Activity, roles: ['admin', 'technical_director', 'head_technician'] },

@@ -16,7 +16,6 @@ import PredictiveMaintenance from '@/components/Analytics/PredictiveMaintenance'
 import InventoryAnalytics from '@/components/Analytics/InventoryAnalytics';
 import SupplierAnalytics from '@/components/Analytics/SupplierAnalytics';
 import { AnimatePresence, motion } from 'framer-motion';
-import NextLevelBIDashboard from '@/components/Analytics/NextLevelBIDashboard';
 
 const MainLayout = ({ user, cart, addToCart, updateCart, clearCart, warehouseState, apiHandlers }) => {
   const { parts, lowStockParts, orders, suppliers, machines, quotations, facilities, movements, assemblies, hotspots, loading, refreshData } = warehouseState;
@@ -78,19 +77,6 @@ const MainLayout = ({ user, cart, addToCart, updateCart, clearCart, warehouseSta
     switch(activeTab) {
       case 'dashboard':
         return <Dashboard user={user} parts={parts} lowStockParts={lowStockParts} orders={orders} suppliers={suppliers} />;
-
-      case 'next_level_bi':
-  return <NextLevelBIDashboard 
-    parts={parts} 
-    movements={movements} 
-    machines={machines}
-    orders={orders}
-    suppliers={suppliers}
-    facilities={facilities}
-    onExport={(format, data) => handleAdvancedExport(format, data)}
-    onShare={(data) => handleDashboardShare(data)}
-  />;
-        
       case 'inventory':
         return <InventoryTab
           user={user}
