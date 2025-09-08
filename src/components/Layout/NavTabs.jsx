@@ -7,8 +7,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, Package, Wrench, Truck, FileText, Users, Shield, Settings, AreaChart, PieChart, Activity, Boxes, BarChart3, ChevronDown, BrainCircuit, Network, TrendingUp } from 'lucide-react';
-
+import { LayoutDashboard, Package, Wrench, Truck, FileText, Users, Shield, Settings, AreaChart, PieChart, Activity, Boxes, BarChart3, ChevronDown, BrainCircuit } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const NavTabs = ({ user, activeTab, setActiveTab }) => {
   const TABS_CONFIG = {
@@ -21,8 +21,6 @@ const NavTabs = ({ user, activeTab, setActiveTab }) => {
   };
 
   const ANALYTICS_TABS_CONFIG = {
-    advanced_analytics: { label: 'Advanced BI', icon: BrainCircuit, roles: ['ceo', 'admin', 'technical_director'] },
-  relationships: { label: 'Relations', icon: Activity, roles: ['admin', 'technical_director', 'head_technician'] },
     executive_dashboard: { label: 'Executive', icon: AreaChart, roles: ['ceo', 'admin'] },
     financial_analytics: { label: 'Financial', icon: PieChart, roles: ['ceo', 'admin'] },
     predictive_maintenance: { label: 'Predictive', icon: Activity, roles: ['admin', 'technical_director', 'head_technician'] },
