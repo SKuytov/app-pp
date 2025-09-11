@@ -27,6 +27,12 @@
   }
 }
 
+// Ultra-efficient re-render prevention
+}, (prevProps, nextProps) => {
+  return prevProps.part.id === nextProps.part.id &&
+         prevProps.part.quantity === nextProps.part.quantity;
+});
+
 @layer base {
   * {
     @apply border-border;
