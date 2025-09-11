@@ -16,23 +16,3 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </AuthProvider>
   </React.StrictMode>
 );
-
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
-
-import { Profiler } from 'react';
-
-const onRenderCallback = (id, phase, actualDuration, baseDuration, startTime, commitTime) => {
-  console.log('Performance:', { id, phase, actualDuration });
-};
-
-// Wrap your InventoryTab
-<Profiler id="InventoryTab" onRender={onRenderCallback}>
-  <InventoryTab {...props} />
-</Profiler>
