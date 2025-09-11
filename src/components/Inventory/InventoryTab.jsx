@@ -1,4 +1,4 @@
-// components/InventoryTab.jsx
+// components/Inventory/InventoryTab.jsx
 import React, { useState, useCallback, useMemo } from 'react';
 import { Plus, Package, AlertTriangle, TrendingUp, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import InventoryTab from './components/Inventory/InventoryTab';
 
 // Optimized components
 import FilterControls from './FilterControls';
@@ -15,11 +14,12 @@ import LazyPartDetailModal from './LazyPartDetailModal';
 import LazyPartForm from './LazyPartForm';
 
 // Custom hooks
-import { useInventoryData } from '../hooks/useInventoryData';
+import { useInventoryData } from '../../hooks/useInventoryData';
 
 const VIRTUALIZED_LIST_HEIGHT = 600;
 
-const InventoryTab = ({ 
+// Make sure there's only ONE declaration of InventoryTab
+const OptimizedInventoryTab = ({ 
   user, 
   addToCart, 
   parts = [], 
@@ -322,4 +322,5 @@ const InventoryTab = ({
   );
 };
 
-export default InventoryTab;
+// Export with the original name to maintain compatibility
+export default OptimizedInventoryTab;
