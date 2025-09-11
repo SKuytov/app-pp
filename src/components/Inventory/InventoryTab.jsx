@@ -3,13 +3,27 @@ import { Search, Plus, Package, AlertTriangle, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import PartCard from '@/components/Inventory/PartCard';
+import OptimizedPartCard from './OptimizedPartCard';
 import PartForm from '@/components/Inventory/PartForm';
 import { useToast } from '@/components/ui/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
-// 🔧 FIXED & OPTIMIZED INVENTORY TAB
-const InventoryTab = ({
+// 🚀 PERFORMANCE: Extract calculation to avoid recreating
+const calculateReorderLevel = (part) => {
+  const weeklyUsage = part.weekly_usage || 0;
+  const monthlyUsage = part.monthly_usage || 0;
+  const leadTimeWeeks = part.lead_time_weeks || 2;
+  const safetyStock = part.safety_stock || Math.ceil((part.min_stock || 0) * 0.2);
+  const effectiveWeeklyUsage = weeklyUsage || (monthlyUsage / 4.33);
+  
+  if (effectiveWeeklyUsage > 0 && leadTimeWeeks > 0) {
+    return Math.ceil((effectiveWeeklyUsage * leadTimeWeeks) + safetyStock);
+  }
+  return part.reorder_level || 0;
+};
+
+// 🚀 ULTRA-OPTIMIZED: Lightweight InventoryTab for maximum performance
+const UltraOptimizedInventoryTab = ({
   user,
   addToCart,
   parts = [],
@@ -34,53 +48,35 @@ const InventoryTab = ({
 
   const { handlePartSubmit, handleDeletePart, recordPartUsage, restockPart } = apiHandlers;
 
-  // 🚀 PERFORMANCE FIX: Memoized reorder level calculation
-  const calculateReorderLevel = useCallback((part) => {
-    const weeklyUsage = part.weekly_usage || 0;
-    const monthlyUsage = part.monthly_usage || 0;
-    const leadTimeWeeks = part.lead_time_weeks || 2;
-    const safetyStock = part.safety_stock || Math.ceil((part.min_stock || 0) * 0.2);
-    
-    const effectiveWeeklyUsage = weeklyUsage || (monthlyUsage / 4.33);
-    
-    if (effectiveWeeklyUsage > 0 && leadTimeWeeks > 0) {
-      return Math.ceil((effectiveWeeklyUsage * leadTimeWeeks) + safetyStock);
-    }
-    return part.reorder_level || 0;
-  }, []);
-
-  // 🐛 BUG FIX: Consistent stats calculation
-  const stats = useMemo(() => {
+  // 🚀 ULTRA-OPTIMIZED: Pre-compute all stats once
+  const computedData = useMemo(() => {
     const baseParts = parts || [];
     const totalParts = baseParts.length;
     const lowStockCount = baseParts.filter(part => part.quantity <= (part.min_stock || 0)).length;
     
-    // 🔧 FIXED: Use consistent reorder level calculation
+    // Pre-calculate reorder levels for all parts
     const reorderCount = baseParts.filter(part => {
       const reorderLevel = calculateReorderLevel(part);
       return part.quantity <= reorderLevel;
     }).length;
-    
-    return { totalParts, lowStockCount, reorderCount };
-  }, [parts, calculateReorderLevel]);
 
-  // 🐛 BUG FIX: Proper search and filtering logic
-  const displayParts = useMemo(() => {
-    // 🔧 FIXED: Handle empty filteredParts by falling back to parts
-    let baseParts = filteredParts && filteredParts.length >= 0 ? filteredParts : parts || [];
+    // Determine display parts
+    let displayParts = filteredParts?.length >= 0 ? filteredParts : baseParts;
     
-    // 🐛 BUG FIX: Apply additional filtering based on active tab
     if (activeTab === 'reorder') {
-      return baseParts.filter(part => {
+      displayParts = displayParts.filter(part => {
         const reorderLevel = calculateReorderLevel(part);
         return part.quantity <= reorderLevel;
       });
     }
-    
-    return baseParts;
-  }, [filteredParts, parts, activeTab, calculateReorderLevel]);
 
-  // 🚀 PERFORMANCE: Memoized event handlers
+    return {
+      stats: { totalParts, lowStockCount, reorderCount },
+      displayParts
+    };
+  }, [parts, filteredParts, activeTab]);
+
+  // 🚀 PERFORMANCE: Stable event handlers
   const handleEdit = useCallback((part) => {
     setEditingPart(part);
     setIsFormOpen(true);
@@ -91,15 +87,15 @@ const InventoryTab = ({
   }, []);
 
   const confirmDelete = useCallback(async () => {
-    if (deletingPart) {
-      try {
-        await handleDeletePart(deletingPart.id);
-        toast({ title: "✅ Part Deleted", description: `${deletingPart.name} has been removed.` });
-      } catch (error) {
-        toast({ variant: "destructive", title: "❌ Delete Failed", description: "Could not delete part." });
-      }
-      setDeletingPart(null);
+    if (!deletingPart) return;
+    
+    try {
+      await handleDeletePart(deletingPart.id);
+      toast({ title: "✅ Part Deleted", description: `${deletingPart.name} removed.` });
+    } catch (error) {
+      toast({ variant: "destructive", title: "❌ Delete Failed", description: "Could not delete part." });
     }
+    setDeletingPart(null);
   }, [deletingPart, handleDeletePart, toast]);
 
   const closeForm = useCallback(() => {
@@ -112,12 +108,12 @@ const InventoryTab = ({
       const result = await handlePartSubmit(partData);
       if (!result?.error) {
         closeForm();
-        toast({ title: "✅ Part Saved", description: "Part has been saved successfully." });
+        toast({ title: "✅ Part Saved", description: "Saved successfully." });
       } else {
-        toast({ variant: "destructive", title: "❌ Save Failed", description: result.error || "Could not save part." });
+        toast({ variant: "destructive", title: "❌ Save Failed", description: result.error });
       }
     } catch (error) {
-      toast({ variant: "destructive", title: "❌ Save Failed", description: "An error occurred while saving." });
+      toast({ variant: "destructive", title: "❌ Error", description: "Save failed." });
     }
   }, [handlePartSubmit, closeForm, toast]);
 
@@ -127,18 +123,20 @@ const InventoryTab = ({
     setSelectedSubGroup('');
   }, [setSearchTerm, setSelectedMainGroup, setSelectedSubGroup]);
 
-  // 🚀 PERFORMANCE: Early return for loading states
+  // 🚀 PERFORMANCE: Early return for loading
   if (!parts) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-slate-400">Loading inventory...</div>
+        <div className="text-slate-400">Loading...</div>
       </div>
     );
   }
 
+  const { stats, displayParts } = computedData;
+
   return (
     <div className="space-y-4">
-      {/* 🎨 IMPROVED: Header with better loading states */}
+      {/* 🔧 SIMPLIFIED: Lightweight header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Inventory</h1>
@@ -147,7 +145,7 @@ const InventoryTab = ({
             {stats.lowStockCount > 0 && (
               <span className="text-red-400 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" />
-                Low Stock: {stats.lowStockCount}
+                Low: {stats.lowStockCount}
               </span>
             )}
             {stats.reorderCount > 0 && (
@@ -161,7 +159,7 @@ const InventoryTab = ({
         {user?.role === 'admin' && (
           <Button
             onClick={() => setIsFormOpen(true)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 transition-colors"
           >
             <Plus className="w-4 h-4" />
             Add Part
@@ -169,7 +167,7 @@ const InventoryTab = ({
         )}
       </div>
 
-      {/* 🔧 FIXED: Search controls with proper debouncing */}
+      {/* 🚀 OPTIMIZED: Lightweight controls */}
       <div className="flex flex-col lg:flex-row gap-3">
         <div className="flex-1 max-w-md">
           <div className="relative">
@@ -178,17 +176,16 @@ const InventoryTab = ({
               placeholder="Search parts..."
               value={searchTerm || ''}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-slate-700/50 border-slate-600 h-9"
+              className="pl-10 bg-slate-700/50 border-slate-600 h-9 transition-colors"
             />
           </div>
         </div>
 
-        {/* 🚀 OPTIMIZED: Filters with proper defaulting */}
         <div className="flex gap-2">
           <select
             value={selectedMainGroup || ''}
             onChange={(e) => setSelectedMainGroup(e.target.value)}
-            className="px-3 py-1 text-sm bg-slate-700 border border-slate-600 rounded text-white h-9"
+            className="px-3 py-1 text-sm bg-slate-700 border border-slate-600 rounded text-white h-9 transition-colors"
           >
             <option value="">All Groups</option>
             {mainGroups.map(group => (
@@ -199,7 +196,7 @@ const InventoryTab = ({
           <select
             value={selectedSubGroup || ''}
             onChange={(e) => setSelectedSubGroup(e.target.value)}
-            className="px-3 py-1 text-sm bg-slate-700 border border-slate-600 rounded text-white h-9"
+            className="px-3 py-1 text-sm bg-slate-700 border border-slate-600 rounded text-white h-9 transition-colors"
           >
             <option value="">All Sub-Groups</option>
             {subGroups.map(group => (
@@ -208,23 +205,18 @@ const InventoryTab = ({
           </select>
 
           {(searchTerm || selectedMainGroup || selectedSubGroup) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={clearFilters}
-              className="h-9 text-xs"
-            >
+            <Button variant="outline" size="sm" onClick={clearFilters} className="h-9 text-xs">
               Clear
             </Button>
           )}
         </div>
       </div>
 
-      {/* 🔧 FIXED: Tabs with correct counts */}
+      {/* 🔧 SIMPLIFIED: Lightweight tabs */}
       <div className="flex border-b border-slate-600">
         <button
           onClick={() => setActiveTab('inventory')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-200 ${
             activeTab === 'inventory'
               ? 'border-blue-500 text-blue-400'
               : 'border-transparent text-slate-400 hover:text-slate-300'
@@ -234,28 +226,32 @@ const InventoryTab = ({
         </button>
         <button
           onClick={() => setActiveTab('reorder')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-200 flex items-center gap-2 ${
             activeTab === 'reorder'
               ? 'border-orange-500 text-orange-400'
               : 'border-transparent text-slate-400 hover:text-slate-300'
           }`}
         >
-          <TrendingUp className="w-3 h-3" />
           Reorder ({stats.reorderCount})
           {stats.reorderCount > 0 && (
-            <Badge variant="destructive" className="text-xs">
-              {stats.reorderCount}
-            </Badge>
+            <Badge variant="destructive" className="text-xs">{stats.reorderCount}</Badge>
           )}
         </button>
       </div>
 
-      {/* 🚀 OPTIMIZED: Parts grid with virtualization ready */}
+      {/* 🚀 ULTRA-OPTIMIZED: Parts grid with optimized rendering */}
       <div className="mt-4">
         {displayParts.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+          <div 
+            className="grid gap-3"
+            style={{
+              gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+              // Optimize for GPU by using transform instead of layout changes
+              willChange: 'transform'
+            }}
+          >
             {displayParts.map((part) => (
-              <PartCard
+              <OptimizedPartCard
                 key={part.id}
                 part={part}
                 onEdit={handleEdit}
@@ -263,7 +259,7 @@ const InventoryTab = ({
                 user={user}
                 movements={movements}
                 recordPartUsage={recordPartUsage}
-                machines={machines || []}
+                machines={machines}
                 restockPart={restockPart}
                 onAddToCart={addToCart}
               />
@@ -277,19 +273,14 @@ const InventoryTab = ({
             </h3>
             <p className="text-slate-400 text-sm">
               {activeTab === 'reorder' 
-                ? 'All parts are adequately stocked'
+                ? 'All parts adequately stocked'
                 : searchTerm || selectedMainGroup || selectedSubGroup
-                  ? 'Try adjusting your search or filters'
-                  : 'Add some parts to get started'
+                  ? 'Try adjusting filters'
+                  : 'Add parts to get started'
               }
             </p>
             {(searchTerm || selectedMainGroup || selectedSubGroup) && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearFilters}
-                className="mt-3"
-              >
+              <Button variant="outline" size="sm" onClick={clearFilters} className="mt-3">
                 Clear Filters
               </Button>
             )}
@@ -297,7 +288,7 @@ const InventoryTab = ({
         )}
       </div>
 
-      {/* 🚀 OPTIMIZED: Form modal with better error handling */}
+      {/* 🚀 OPTIMIZED: Conditional form rendering */}
       {isFormOpen && (
         <PartForm
           title={editingPart ? 'Edit Part' : 'Add New Part'}
@@ -307,24 +298,20 @@ const InventoryTab = ({
         />
       )}
 
-      {/* 🔧 IMPROVED: Delete confirmation with better UX */}
+      {/* 🔧 SIMPLIFIED: Delete dialog */}
       {deletingPart && (
         <AlertDialog open={!!deletingPart} onOpenChange={() => setDeletingPart(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Part?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete "{deletingPart.name}" ({deletingPart.part_number}) and cannot be undone.
-                This action will also remove any associated movement history.
+                Delete "{deletingPart.name}" ({deletingPart.part_number})? This cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={confirmDelete}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                Delete Part
+              <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+                Delete
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -334,4 +321,4 @@ const InventoryTab = ({
   );
 };
 
-export default InventoryTab;
+export default UltraOptimizedInventoryTab;
