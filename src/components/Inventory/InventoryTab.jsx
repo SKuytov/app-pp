@@ -1,335 +1,323 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { Search, Plus, Package, AlertTriangle, TrendingUp } from 'lucide-react';
+// components/InventoryTab.jsx
+import React, { useState, useCallback, useMemo } from 'react';
+import { Plus, Package, AlertTriangle, TrendingUp, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import PartCard from '@/components/Inventory/PartCard';
-import PartForm from '@/components/Inventory/PartForm';
 import { useToast } from '@/components/ui/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import InventoryTab from './components/Inventory/InventoryTab';
 
-// 🔧 FIXED & OPTIMIZED INVENTORY TAB
-const InventoryTab = ({
-  user,
-  addToCart,
-  parts = [],
-  filteredParts = [],
-  searchTerm,
-  setSearchTerm,
-  selectedMainGroup,
-  setSelectedMainGroup,
-  selectedSubGroup,
-  setSelectedSubGroup,
-  mainGroups = [],
-  subGroups = [],
-  machines,
-  apiHandlers,
-  movements
+// Optimized components
+import FilterControls from './FilterControls';
+import VirtualizedPartsList from './VirtualizedPartsList';
+import LazyPartDetailModal from './LazyPartDetailModal';
+import LazyPartForm from './LazyPartForm';
+
+// Custom hooks
+import { useInventoryData } from '../hooks/useInventoryData';
+
+const VIRTUALIZED_LIST_HEIGHT = 600;
+
+const InventoryTab = ({ 
+  user, 
+  addToCart, 
+  parts = [], 
+  machines = [], 
+  apiHandlers, 
+  movements = [] 
 }) => {
   const { toast } = useToast();
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingPart, setEditingPart] = useState(null);
+  
+  // Use optimized data management hook
+  const {
+    parts: filteredParts,
+    allParts,
+    stats,
+    isLoading,
+    searchTerm,
+    selectedMainGroup,
+    selectedSubGroup,
+    mainGroups,
+    subGroups,
+    sortBy,
+    sortOrder,
+    activeTab,
+    handleSearchChange,
+    handleMainGroupChange,
+    handleSubGroupChange,
+    handleSortChange,
+    handleTabChange,
+    clearFilters,
+    hasFilters,
+    isEmpty,
+    totalCount,
+    filteredCount,
+    updateParts
+  } = useInventoryData(parts);
+
+  // Modal and form states
+  const [detailModalState, setDetailModalState] = useState({ isOpen: false, part: null });
+  const [formState, setFormState] = useState({ isOpen: false, editingPart: null });
   const [deletingPart, setDeletingPart] = useState(null);
-  const [activeTab, setActiveTab] = useState('inventory');
 
   const { handlePartSubmit, handleDeletePart, recordPartUsage, restockPart } = apiHandlers;
 
-  // 🚀 PERFORMANCE FIX: Memoized reorder level calculation
-  const calculateReorderLevel = useCallback((part) => {
-    const weeklyUsage = part.weekly_usage || 0;
-    const monthlyUsage = part.monthly_usage || 0;
-    const leadTimeWeeks = part.lead_time_weeks || 2;
-    const safetyStock = part.safety_stock || Math.ceil((part.min_stock || 0) * 0.2);
-    
-    const effectiveWeeklyUsage = weeklyUsage || (monthlyUsage / 4.33);
-    
-    if (effectiveWeeklyUsage > 0 && leadTimeWeeks > 0) {
-      return Math.ceil((effectiveWeeklyUsage * leadTimeWeeks) + safetyStock);
-    }
-    return part.reorder_level || 0;
+  // Memoized event handlers for better performance
+  const handleView = useCallback((part) => {
+    setDetailModalState({ isOpen: true, part });
   }, []);
 
-  // 🐛 BUG FIX: Consistent stats calculation
-  const stats = useMemo(() => {
-    const baseParts = parts || [];
-    const totalParts = baseParts.length;
-    const lowStockCount = baseParts.filter(part => part.quantity <= (part.min_stock || 0)).length;
-    
-    // 🔧 FIXED: Use consistent reorder level calculation
-    const reorderCount = baseParts.filter(part => {
-      const reorderLevel = calculateReorderLevel(part);
-      return part.quantity <= reorderLevel;
-    }).length;
-    
-    return { totalParts, lowStockCount, reorderCount };
-  }, [parts, calculateReorderLevel]);
+  const handleCloseDetailModal = useCallback(() => {
+    setDetailModalState({ isOpen: false, part: null });
+  }, []);
 
-  // 🐛 BUG FIX: Proper search and filtering logic
-  const displayParts = useMemo(() => {
-    // 🔧 FIXED: Handle empty filteredParts by falling back to parts
-    let baseParts = filteredParts && filteredParts.length >= 0 ? filteredParts : parts || [];
-    
-    // 🐛 BUG FIX: Apply additional filtering based on active tab
-    if (activeTab === 'reorder') {
-      return baseParts.filter(part => {
-        const reorderLevel = calculateReorderLevel(part);
-        return part.quantity <= reorderLevel;
-      });
-    }
-    
-    return baseParts;
-  }, [filteredParts, parts, activeTab, calculateReorderLevel]);
-
-  // 🚀 PERFORMANCE: Memoized event handlers
   const handleEdit = useCallback((part) => {
-    setEditingPart(part);
-    setIsFormOpen(true);
+    setFormState({ isOpen: true, editingPart: part });
+  }, []);
+
+  const handleCloseForm = useCallback(() => {
+    setFormState({ isOpen: false, editingPart: null });
   }, []);
 
   const handleDeleteRequest = useCallback((part) => {
     setDeletingPart(part);
   }, []);
 
+  const handleAddToCart = useCallback((part) => {
+    if (part.quantity > 0) {
+      addToCart(part);
+      toast({
+        title: "✅ Added to Cart",
+        description: `${part.name} has been added to your cart.`
+      });
+    }
+  }, [addToCart, toast]);
+
   const confirmDelete = useCallback(async () => {
     if (deletingPart) {
       try {
         await handleDeletePart(deletingPart.id);
-        toast({ title: "✅ Part Deleted", description: `${deletingPart.name} has been removed.` });
+        toast({
+          title: "✅ Part Deleted",
+          description: `${deletingPart.name} has been removed.`
+        });
       } catch (error) {
-        toast({ variant: "destructive", title: "❌ Delete Failed", description: "Could not delete part." });
+        toast({
+          variant: "destructive",
+          title: "❌ Delete Failed",
+          description: "Could not delete part."
+        });
       }
       setDeletingPart(null);
     }
   }, [deletingPart, handleDeletePart, toast]);
 
-  const closeForm = useCallback(() => {
-    setEditingPart(null);
-    setIsFormOpen(false);
-  }, []);
-
   const handleFormSubmit = useCallback(async (partData) => {
     try {
       const result = await handlePartSubmit(partData);
       if (!result?.error) {
-        closeForm();
-        toast({ title: "✅ Part Saved", description: "Part has been saved successfully." });
+        handleCloseForm();
+        toast({
+          title: "✅ Part Saved",
+          description: "Part has been saved successfully."
+        });
       } else {
-        toast({ variant: "destructive", title: "❌ Save Failed", description: result.error || "Could not save part." });
+        toast({
+          variant: "destructive",
+          title: "❌ Save Failed",
+          description: result.error || "Could not save part."
+        });
       }
     } catch (error) {
-      toast({ variant: "destructive", title: "❌ Save Failed", description: "An error occurred while saving." });
+      toast({
+        variant: "destructive",
+        title: "❌ Save Failed",
+        description: "An error occurred while saving."
+      });
     }
-  }, [handlePartSubmit, closeForm, toast]);
+  }, [handlePartSubmit, handleCloseForm, toast]);
 
-  const clearFilters = useCallback(() => {
-    setSearchTerm('');
-    setSelectedMainGroup('');
-    setSelectedSubGroup('');
-  }, [setSearchTerm, setSelectedMainGroup, setSelectedSubGroup]);
+  // Memoized statistics display
+  const StatsCards = useMemo(() => (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
+        <div className="flex items-center gap-2 mb-2">
+          <Package className="w-5 h-5 text-blue-400" />
+          <span className="text-sm text-slate-300">Total Parts</span>
+        </div>
+        <div className="text-2xl font-bold text-slate-100">{stats.totalParts.toLocaleString()}</div>
+      </div>
 
-  // 🚀 PERFORMANCE: Early return for loading states
-  if (!parts) {
+      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
+        <div className="flex items-center gap-2 mb-2">
+          <AlertTriangle className="w-5 h-5 text-red-400" />
+          <span className="text-sm text-slate-300">Low Stock</span>
+        </div>
+        <div className="text-2xl font-bold text-red-400">{stats.lowStockCount.toLocaleString()}</div>
+      </div>
+
+      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
+        <div className="flex items-center gap-2 mb-2">
+          <TrendingUp className="w-5 h-5 text-orange-400" />
+          <span className="text-sm text-slate-300">Reorder</span>
+        </div>
+        <div className="text-2xl font-bold text-orange-400">{stats.reorderCount.toLocaleString()}</div>
+      </div>
+
+      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
+        <div className="flex items-center gap-2 mb-2">
+          <BarChart3 className="w-5 h-5 text-slate-400" />
+          <span className="text-sm text-slate-300">Out of Stock</span>
+        </div>
+        <div className="text-2xl font-bold text-slate-400">{stats.outOfStockCount.toLocaleString()}</div>
+      </div>
+    </div>
+  ), [stats]);
+
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-slate-400">Loading inventory...</div>
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center text-slate-400">
+          <Package className="w-12 h-12 mx-auto mb-4 animate-pulse" />
+          <div className="text-lg">Loading inventory...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* 🎨 IMPROVED: Header with better loading states */}
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Inventory</h1>
-          <div className="flex items-center gap-4 text-sm text-slate-400 mt-1">
-            <span>Total: {stats.totalParts}</span>
-            {stats.lowStockCount > 0 && (
-              <span className="text-red-400 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />
-                Low Stock: {stats.lowStockCount}
-              </span>
-            )}
-            {stats.reorderCount > 0 && (
-              <span className="text-orange-400 flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" />
-                Reorder: {stats.reorderCount}
-              </span>
-            )}
-          </div>
+          <h2 className="text-2xl font-bold text-slate-100">Inventory Management</h2>
+          <p className="text-slate-400">Manage your parts and stock levels efficiently</p>
         </div>
+        
         {user?.role === 'admin' && (
           <Button
-            onClick={() => setIsFormOpen(true)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+            onClick={() => setFormState({ isOpen: true, editingPart: null })}
+            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 mr-2" />
             Add Part
           </Button>
         )}
       </div>
 
-      {/* 🔧 FIXED: Search controls with proper debouncing */}
-      <div className="flex flex-col lg:flex-row gap-3">
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-            <Input
-              placeholder="Search parts..."
-              value={searchTerm || ''}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-slate-700/50 border-slate-600 h-9"
-            />
-          </div>
-        </div>
+      {/* Statistics */}
+      {StatsCards}
 
-        {/* 🚀 OPTIMIZED: Filters with proper defaulting */}
-        <div className="flex gap-2">
-          <select
-            value={selectedMainGroup || ''}
-            onChange={(e) => setSelectedMainGroup(e.target.value)}
-            className="px-3 py-1 text-sm bg-slate-700 border border-slate-600 rounded text-white h-9"
-          >
-            <option value="">All Groups</option>
-            {mainGroups.map(group => (
-              <option key={group} value={group}>{group}</option>
-            ))}
-          </select>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <TabsList className="grid grid-cols-4 w-full max-w-md bg-slate-800/50">
+          <TabsTrigger value="inventory">All Inventory</TabsTrigger>
+          <TabsTrigger value="reorder" className="text-orange-400">
+            Reorder ({stats.reorderCount})
+          </TabsTrigger>
+          <TabsTrigger value="lowstock" className="text-red-400">
+            Low Stock ({stats.lowStockCount})
+          </TabsTrigger>
+          <TabsTrigger value="outofstock" className="text-slate-400">
+            Out of Stock ({stats.outOfStockCount})
+          </TabsTrigger>
+        </TabsList>
 
-          <select
-            value={selectedSubGroup || ''}
-            onChange={(e) => setSelectedSubGroup(e.target.value)}
-            className="px-3 py-1 text-sm bg-slate-700 border border-slate-600 rounded text-white h-9"
-          >
-            <option value="">All Sub-Groups</option>
-            {subGroups.map(group => (
-              <option key={group} value={group}>{group}</option>
-            ))}
-          </select>
+        <TabsContent value={activeTab} className="space-y-4">
+          {/* Filter Controls */}
+          <FilterControls
+            searchTerm={searchTerm}
+            onSearchChange={handleSearchChange}
+            selectedMainGroup={selectedMainGroup}
+            onMainGroupChange={handleMainGroupChange}
+            selectedSubGroup={selectedSubGroup}
+            onSubGroupChange={handleSubGroupChange}
+            mainGroups={mainGroups}
+            subGroups={subGroups}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSortChange={handleSortChange}
+            onClearFilters={clearFilters}
+            hasFilters={hasFilters}
+            totalCount={totalCount}
+            filteredCount={filteredCount}
+          />
 
-          {(searchTerm || selectedMainGroup || selectedSubGroup) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={clearFilters}
-              className="h-9 text-xs"
-            >
-              Clear
-            </Button>
+          {/* Virtualized Parts List */}
+          <VirtualizedPartsList
+            parts={filteredParts}
+            onEdit={handleEdit}
+            onDelete={handleDeleteRequest}
+            onView={handleView}
+            onAddToCart={handleAddToCart}
+            user={user}
+            containerHeight={VIRTUALIZED_LIST_HEIGHT}
+          />
+
+          {/* Empty State */}
+          {isEmpty && (
+            <div className="text-center py-12">
+              <Package className="w-16 h-16 mx-auto mb-4 text-slate-500" />
+              <h3 className="text-lg font-medium text-slate-300 mb-2">
+                {activeTab === 'reorder' ? 'All parts are adequately stocked' :
+                 activeTab === 'lowstock' ? 'No low stock items' :
+                 activeTab === 'outofstock' ? 'No out of stock items' :
+                 hasFilters ? 'No parts match your filters' : 'No parts found'}
+              </h3>
+              <p className="text-slate-400 mb-4">
+                {hasFilters ? 'Try adjusting your search or filters' : 'Add some parts to get started'}
+              </p>
+              {hasFilters && (
+                <Button onClick={clearFilters} variant="outline">
+                  Clear Filters
+                </Button>
+              )}
+            </div>
           )}
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
 
-      {/* 🔧 FIXED: Tabs with correct counts */}
-      <div className="flex border-b border-slate-600">
-        <button
-          onClick={() => setActiveTab('inventory')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'inventory'
-              ? 'border-blue-500 text-blue-400'
-              : 'border-transparent text-slate-400 hover:text-slate-300'
-          }`}
-        >
-          Inventory ({activeTab === 'inventory' ? displayParts.length : (filteredParts?.length || parts.length)})
-        </button>
-        <button
-          onClick={() => setActiveTab('reorder')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-            activeTab === 'reorder'
-              ? 'border-orange-500 text-orange-400'
-              : 'border-transparent text-slate-400 hover:text-slate-300'
-          }`}
-        >
-          <TrendingUp className="w-3 h-3" />
-          Reorder ({stats.reorderCount})
-          {stats.reorderCount > 0 && (
-            <Badge variant="destructive" className="text-xs">
-              {stats.reorderCount}
-            </Badge>
-          )}
-        </button>
-      </div>
+      {/* Lazy-loaded Modals */}
+      <LazyPartDetailModal
+        isOpen={detailModalState.isOpen}
+        onClose={handleCloseDetailModal}
+        part={detailModalState.part}
+        onEdit={handleEdit}
+        onDelete={handleDeleteRequest}
+        user={user}
+        movements={movements}
+        recordPartUsage={recordPartUsage}
+        machines={machines}
+        restockPart={restockPart}
+        onAddToCart={handleAddToCart}
+      />
 
-      {/* 🚀 OPTIMIZED: Parts grid with virtualization ready */}
-      <div className="mt-4">
-        {displayParts.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
-            {displayParts.map((part) => (
-              <PartCard
-                key={part.id}
-                part={part}
-                onEdit={handleEdit}
-                onDelete={handleDeleteRequest}
-                user={user}
-                movements={movements}
-                recordPartUsage={recordPartUsage}
-                machines={machines || []}
-                restockPart={restockPart}
-                onAddToCart={addToCart}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <Package className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-slate-300 mb-1">
-              {activeTab === 'reorder' ? 'No Reorders Needed' : 'No Parts Found'}
-            </h3>
-            <p className="text-slate-400 text-sm">
-              {activeTab === 'reorder' 
-                ? 'All parts are adequately stocked'
-                : searchTerm || selectedMainGroup || selectedSubGroup
-                  ? 'Try adjusting your search or filters'
-                  : 'Add some parts to get started'
-              }
-            </p>
-            {(searchTerm || selectedMainGroup || selectedSubGroup) && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearFilters}
-                className="mt-3"
-              >
-                Clear Filters
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
+      <LazyPartForm
+        isOpen={formState.isOpen}
+        onClose={handleCloseForm}
+        onSubmit={handleFormSubmit}
+        part={formState.editingPart}
+        title={formState.editingPart ? 'Edit Part' : 'Add New Part'}
+      />
 
-      {/* 🚀 OPTIMIZED: Form modal with better error handling */}
-      {isFormOpen && (
-        <PartForm
-          title={editingPart ? 'Edit Part' : 'Add New Part'}
-          initialData={editingPart}
-          onSubmit={handleFormSubmit}
-          onCancel={closeForm}
-        />
-      )}
-
-      {/* 🔧 IMPROVED: Delete confirmation with better UX */}
-      {deletingPart && (
-        <AlertDialog open={!!deletingPart} onOpenChange={() => setDeletingPart(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Part?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently delete "{deletingPart.name}" ({deletingPart.part_number}) and cannot be undone.
-                This action will also remove any associated movement history.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={confirmDelete}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                Delete Part
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingPart} onOpenChange={() => setDeletingPart(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Part</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deletingPart?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
