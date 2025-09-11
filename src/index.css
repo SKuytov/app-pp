@@ -80,10 +80,3 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
-
-/* Add to your global CSS for hardware acceleration */
-.part-card {
-  will-change: transform;
-  contain: layout style paint;
-}
-
