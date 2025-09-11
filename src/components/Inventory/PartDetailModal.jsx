@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { X, AlertTriangle, DraftingCompass, FileText, MinusCircle, PlusCircle, ShoppingCart, Package } from 'lucide-react';
+import { X, AlertTriangle, DraftingCompass, FileText, MinusCircle, PlusCircle, ShoppingCart, Package, Building2, Calculator, TrendingUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -10,7 +10,19 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCurrency } from '@/contexts/CurrencyContext';
 
-const PartDetailModal = ({ isOpen, onClose, part, onEdit, onDelete, user, movements, recordPartUsage, machines, restockPart, onAddToCart }) => {
+const PartDetailModal = ({ 
+  isOpen, 
+  onClose, 
+  part, 
+  onEdit, 
+  onDelete, 
+  user, 
+  movements, 
+  recordPartUsage, 
+  machines, 
+  restockPart, 
+  onAddToCart 
+}) => {
   const { toast } = useToast();
   const { formatCurrency } = useCurrency();
   const [isUsePartOpen, setIsUsePartOpen] = useState(false);
@@ -19,6 +31,27 @@ const PartDetailModal = ({ isOpen, onClose, part, onEdit, onDelete, user, moveme
   const [restockQuantity, setRestockQuantity] = useState(1);
   const [selectedMachine, setSelectedMachine] = useState('');
 
+  // Calculate total inventory value
+  const totalValue = useMemo(() => {
+    return (part.quantity || 0) * (part.price || 0);
+  }, [part.quantity, part.price]);
+
+  // Calculate reorder level for weekly/monthly consumption
+  const reorderLevel = useMemo(() => {
+    const weeklyUsage = part.weekly_usage || 0;
+    const monthlyUsage = part.monthly_usage || 0;
+    const leadTimeWeeks = part.lead_time_weeks || 2; // Default 2 weeks
+    const safetyStock = part.safety_stock || Math.ceil((part.min_stock || 0) * 0.2);
+    
+    // Use weekly if available, otherwise convert monthly to weekly
+    const effectiveWeeklyUsage = weeklyUsage || (monthlyUsage / 4.33); // 4.33 weeks per month average
+    
+    return Math.ceil((effectiveWeeklyUsage * leadTimeWeeks) + safetyStock);
+  }, [part.weekly_usage, part.monthly_usage, part.lead_time_weeks, part.safety_stock, part.min_stock]);
+
+  // Determine if we need to reorder
+  const needsReorder = part.quantity <= reorderLevel;
+
   const handleLinkClick = (url, feature) => {
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
     else toast({ variant: "destructive", title: "Not Available", description: `This part does not have a ${feature} link.` });
@@ -26,8 +59,8 @@ const PartDetailModal = ({ isOpen, onClose, part, onEdit, onDelete, user, moveme
   
   const handleUsePart = async () => {
     if (useQuantity <= 0) {
-        toast({ variant: "destructive", title: "Invalid Quantity", description: `Please enter a positive number.` });
-        return;
+      toast({ variant: "destructive", title: "Invalid Quantity", description: `Please enter a positive number.` });
+      return;
     }
     if (useQuantity > part.quantity) {
       toast({ variant: "destructive", title: "Not enough stock", description: `You only have ${part.quantity} available.` });
@@ -40,7 +73,7 @@ const PartDetailModal = ({ isOpen, onClose, part, onEdit, onDelete, user, moveme
       setUseQuantity(1);
       setSelectedMachine('');
     } else {
-       toast({ variant: "destructive", title: "Error", description: `Could not use part. Check stock levels.` });
+      toast({ variant: "destructive", title: "Error", description: `Could not use part. Check stock levels.` });
     }
   };
 
@@ -57,8 +90,8 @@ const PartDetailModal = ({ isOpen, onClose, part, onEdit, onDelete, user, moveme
   
   const handleAddToCart = () => {
     if (part.quantity <= 0) {
-        toast({ variant: "destructive", title: "Out of Stock", description: "This part cannot be added to the cart." });
-        return;
+      toast({ variant: "destructive", title: "Out of Stock", description: "This part cannot be added to the cart." });
+      return;
     }
     onAddToCart(part);
     onClose();
@@ -70,118 +103,291 @@ const PartDetailModal = ({ isOpen, onClose, part, onEdit, onDelete, user, moveme
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={onClose}>
-      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl border border-white/20 w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h2 className="text-2xl font-bold text-white">{part.name}</h2>
-          <Button variant="ghost" size="icon" onClick={onClose} className="text-slate-400 hover:text-white"><X className="h-6 w-6" /></Button>
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="bg-slate-800/95 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-6 border-b border-slate-600">
+          <div>
+            <h2 className="text-2xl font-bold text-white">{part.name}</h2>
+            <p className="text-slate-300 mt-1">Part Details</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose} className="text-slate-400 hover:text-white">
+            <X size={20} />
+          </Button>
         </div>
-        <div className="flex-grow overflow-y-auto p-6">
+
+        <div className="p-6">
           <Tabs defaultValue="details" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-slate-800/50">
+            <TabsList className="grid w-full grid-cols-2 bg-slate-700">
               <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="history">Movement History <Badge className="ml-2">{partMovements.length}</Badge></TabsTrigger>
+              <TabsTrigger value="movement-history">Movement History ({partMovements.length})</TabsTrigger>
             </TabsList>
-            <TabsContent value="details" className="mt-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-900">
-                    {part.image_url ? 
-                        <img src={part.image_url} alt={part.name} className="w-full h-full object-cover" /> 
-                      : 
-                        <div className="w-full h-full flex items-center justify-center text-slate-500 flex-col">
-                            <Package className="h-16 w-16"/>
-                            <p>No Image</p>
-                        </div>
-                    }
-                  </div>
+
+            <TabsContent value="details" className="mt-6 space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-1">
+                  {part.image_url ? 
+                    <img src={part.image_url} alt={part.name} className="w-full h-64 object-cover rounded-lg" /> 
+                    : 
+                    <div className="w-full h-64 bg-slate-700 rounded-lg flex items-center justify-center">
+                      <Package className="w-16 h-16 text-slate-400" />
+                      <span className="ml-2 text-slate-400">No Image</span>
+                    </div>
+                  }
                 </div>
-                <div className="space-y-4">
-                  <div className="p-4 bg-slate-800/50 rounded-lg">
-                    <p className="text-sm text-slate-400 mb-2">{part.part_number}</p>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      <Badge className="bg-gray-700 text-gray-200">{part.main_group}</Badge>
-                      <Badge className="bg-blue-900/50 text-blue-300">{part.sub_group}</Badge>
-                      <Badge className="bg-purple-500/20 text-purple-300">Crit: {part.criticality}</Badge>
-                      <Badge className="bg-green-500/20 text-green-300">{formatCurrency(part.price)}</Badge>
+
+                <div className="lg:col-span-2 space-y-4">
+                  {/* Enhanced Information Grid */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-700/50 p-4 rounded-lg">
+                      <p className="text-slate-300 text-sm">Part Number</p>
+                      <p className="text-white font-mono text-lg">{part.part_number}</p>
                     </div>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span>Quantity:</span> <span className={`font-bold ${part.quantity <= part.min_stock ? 'text-red-400' : 'text-white'}`}>{part.quantity}</span></div>
-                      <div className="flex justify-between"><span>Min Stock:</span> <span className="text-white">{part.min_stock}</span></div>
-                      <div className="flex justify-between"><span>Location:</span> <span className="text-white">{part.location}</span></div>
-                      <div className="flex justify-between"><span>Supplier:</span> <span className="text-white">{part.supplier}</span></div>
+                    <div className="bg-slate-700/50 p-4 rounded-lg">
+                      <p className="text-slate-300 text-sm">Supplier ID</p>
+                      <p className="text-white font-mono text-lg flex items-center">
+                        <Building2 className="w-4 h-4 mr-2" />
+                        {part.supplier_id || 'N/A'}
+                      </p>
                     </div>
-                    {part.quantity <= part.min_stock && <div className="flex items-center space-x-2 mt-4 p-2 bg-red-500/20 rounded-lg border border-red-500/30"><AlertTriangle className="h-4 w-4 text-red-400" /><span className="text-red-300 text-sm font-medium">Low Stock Alert</span></div>}
                   </div>
-                  <div className="p-4 bg-slate-800/50 rounded-lg">
-                    <h4 className="font-semibold text-white mb-3">Assets & Files</h4>
-                    <div className="flex space-x-2">
-                        <Button className="flex-1" variant="outline" onClick={() => handleLinkClick(part.cad_url, 'CAD file')}><DraftingCompass className="mr-2 h-4 w-4"/> CAD File</Button>
-                    </div>
-                    {attachments.length > 0 && <div className="mt-3"><h5 className="text-sm font-semibold text-slate-300 mb-2">Attachments:</h5><div className="flex flex-col space-y-2">{attachments.map((file, index) => <a key={index} href={file} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline text-sm flex items-center"><FileText className="mr-2 h-4 w-4" />{file.split('/').pop()}</a>)}</div></div>}
+
+                  <div className="flex gap-2">
+                    <Badge variant="secondary">{part.main_group}</Badge>
+                    <Badge variant="secondary">{part.sub_group}</Badge>
+                    <Badge variant="outline">Crit: {part.criticality}</Badge>
                   </div>
-                   {user.role === 'admin' && !isUsePartOpen && !isRestockOpen && (
-                    <div className="flex gap-2">
-                      <Button className="w-full" onClick={() => setIsUsePartOpen(true)}><MinusCircle className="mr-2 h-4 w-4" /> Use Part</Button>
-                      <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => setIsRestockOpen(true)}><PlusCircle className="mr-2 h-4 w-4" /> Restock</Button>
-                    </div>
-                   )}
-                   {isUsePartOpen && (
-                     <div className="p-4 bg-blue-900/20 rounded-lg space-y-3">
-                       <h4 className="font-semibold text-white">Use Part</h4>
-                       <div className="flex gap-2">
-                         <Input type="number" value={useQuantity} onChange={(e) => setUseQuantity(parseInt(e.target.value))} min="1" max={part.quantity} className="w-24 bg-slate-700"/>
-                         <Select onValueChange={setSelectedMachine} value={selectedMachine}><SelectTrigger><SelectValue placeholder="Assign to Machine (Optional)"/></SelectTrigger><SelectContent>{(machines || []).map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent></Select>
-                       </div>
-                       <div className="flex gap-2"><Button size="sm" onClick={handleUsePart}>Confirm Use</Button><Button size="sm" variant="ghost" onClick={() => setIsUsePartOpen(false)}>Cancel</Button></div>
-                     </div>
-                   )}
-                   {isRestockOpen && (
-                     <div className="p-4 bg-green-900/20 rounded-lg space-y-3">
-                       <h4 className="font-semibold text-white">Restock Part</h4>
-                       <div className="flex gap-2 items-center">
-                         <Input type="number" value={restockQuantity} onChange={(e) => setRestockQuantity(parseInt(e.target.value))} min="1" className="w-32 bg-slate-700"/>
-                         <span className="text-white">items</span>
-                       </div>
-                       <div className="flex gap-2"><Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={handleRestockPart}>Confirm Restock</Button><Button size="sm" variant="ghost" onClick={() => setIsRestockOpen(false)}>Cancel</Button></div>
-                     </div>
-                   )}
-                </div>
-              </div>
-            </TabsContent>
-            <TabsContent value="history" className="mt-4">
-              <div className="text-white space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-                {partMovements.length > 0 ? partMovements.map(m => (
-                  <div key={m.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      {m.type === 'IN' ? <PlusCircle className="h-5 w-5 text-green-400" /> : <MinusCircle className="h-5 w-5 text-red-400" />}
+
+                  {/* Enhanced Pricing Information */}
+                  <div className="bg-blue-900/30 p-4 rounded-lg border border-blue-500/30">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="font-semibold">
-                          {m.description}{' '}
-                          <span className={`font-bold ${m.type === 'IN' ? 'text-green-400' : 'text-red-400'}`}>
-                            ({m.type === 'IN' ? '+' : '-'}{m.quantity})
-                          </span>
+                        <p className="text-blue-300 text-sm">Unit Price (per 1 pcs)</p>
+                        <p className="text-white text-xl font-bold">{formatCurrency(part.price)}</p>
+                      </div>
+                      <div>
+                        <p className="text-blue-300 text-sm">Total Value ({part.quantity} pcs)</p>
+                        <p className="text-green-400 text-xl font-bold flex items-center">
+                          <Calculator className="w-5 h-5 mr-2" />
+                          {formatCurrency(totalValue)}
                         </p>
-                        <p className="text-sm text-slate-400">by {m.user_name}</p>
                       </div>
                     </div>
-                    <p className="text-sm text-slate-400">{format(new Date(m.timestamp), "MMM d, yyyy 'at' hh:mm a")}</p>
                   </div>
-                )) : <p className="text-center text-slate-400 py-8">No movement history for this part.</p>}
+
+                  {/* Inventory Status */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-slate-700/50 p-3 rounded-lg text-center">
+                      <p className="text-slate-300 text-xs">Current Stock</p>
+                      <p className="text-white text-lg font-bold">{part.quantity}</p>
+                    </div>
+                    <div className="bg-slate-700/50 p-3 rounded-lg text-center">
+                      <p className="text-slate-300 text-xs">Min Stock</p>
+                      <p className="text-white text-lg font-bold">{part.min_stock}</p>
+                    </div>
+                    <div className="bg-orange-900/30 p-3 rounded-lg text-center border border-orange-500/30">
+                      <p className="text-orange-300 text-xs">Reorder Level</p>
+                      <p className="text-orange-400 text-lg font-bold flex items-center justify-center">
+                        <TrendingUp className="w-4 h-4 mr-1" />
+                        {reorderLevel}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Consumption Pattern Display */}
+                  <div className="bg-purple-900/20 p-3 rounded-lg border border-purple-500/30">
+                    <p className="text-purple-300 text-sm mb-2">Consumption Pattern</p>
+                    <div className="grid grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <span className="text-purple-200">Weekly Usage:</span>
+                        <span className="text-white font-semibold ml-2">{part.weekly_usage || 'Not set'}</span>
+                      </div>
+                      <div>
+                        <span className="text-purple-200">Monthly Usage:</span>
+                        <span className="text-white font-semibold ml-2">{part.monthly_usage || 'Not set'}</span>
+                      </div>
+                      <div>
+                        <span className="text-purple-200">Lead Time:</span>
+                        <span className="text-white font-semibold ml-2">{part.lead_time_weeks || 2} weeks</span>
+                      </div>
+                      <div>
+                        <span className="text-purple-200">Safety Stock:</span>
+                        <span className="text-white font-semibold ml-2">{part.safety_stock || 'Auto'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Additional Information */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-700/50 p-3 rounded-lg">
+                      <p className="text-slate-300 text-sm">Location</p>
+                      <p className="text-white">{part.location}</p>
+                    </div>
+                    <div className="bg-slate-700/50 p-3 rounded-lg">
+                      <p className="text-slate-300 text-sm">Supplier Name</p>
+                      <p className="text-white">{part.supplier}</p>
+                    </div>
+                  </div>
+
+                  {/* Alerts */}
+                  <div className="space-y-2">
+                    {part.quantity <= part.min_stock && (
+                      <div className="bg-red-900/30 border border-red-500/50 p-3 rounded-lg flex items-center">
+                        <AlertTriangle className="w-5 h-5 text-red-400 mr-2" />
+                        <span className="text-red-300">Low Stock Alert</span>
+                      </div>
+                    )}
+                    {needsReorder && (
+                      <div className="bg-orange-900/30 border border-orange-500/50 p-3 rounded-lg flex items-center">
+                        <TrendingUp className="w-5 h-5 text-orange-400 mr-2" />
+                        <span className="text-orange-300">Reorder Required - Stock below reorder level</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Assets & Files */}
+              <div className="bg-slate-700/30 p-4 rounded-lg">
+                <h4 className="text-white font-semibold mb-3">Assets & Files</h4>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleLinkClick(part.cad_url, 'CAD file')}
+                    className="text-slate-300 border-slate-600 hover:border-slate-400"
+                  >
+                    <DraftingCompass className="w-4 h-4 mr-2" />
+                    CAD File
+                  </Button>
+                </div>
+                {attachments.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-slate-300 text-sm font-medium mb-2">Attachments:</p>
+                    {attachments.map((file, index) => (
+                      <p key={index} className="text-slate-400 text-sm">{file.split('/').pop()}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              {user.role === 'admin' && !isUsePartOpen && !isRestockOpen && (
+                <div className="flex gap-2">
+                  <Button variant="destructive" size="sm" onClick={() => setIsUsePartOpen(true)}>
+                    <MinusCircle className="w-4 h-4 mr-2" />
+                    Use Part
+                  </Button>
+                  <Button variant="default" size="sm" onClick={() => setIsRestockOpen(true)}>
+                    <PlusCircle className="w-4 h-4 mr-2" />
+                    Restock
+                  </Button>
+                </div>
+              )}
+
+              {/* Use Part Form */}
+              {isUsePartOpen && (
+                <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-lg">
+                  <h4 className="text-red-300 font-semibold mb-3">Use Part</h4>
+                  <div className="flex items-center gap-4">
+                    <Input
+                      type="number"
+                      value={useQuantity}
+                      onChange={e => setUseQuantity(parseInt(e.target.value))}
+                      min="1"
+                      max={part.quantity}
+                      className="w-24 bg-slate-700"
+                    />
+                    <Select value={selectedMachine} onValueChange={setSelectedMachine}>
+                      <SelectTrigger className="w-48 bg-slate-700">
+                        <SelectValue placeholder="Select machine..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(machines || []).map(m => (
+                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={handleUsePart} size="sm">Confirm Use</Button>
+                    <Button variant="ghost" onClick={() => setIsUsePartOpen(false)} size="sm">Cancel</Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Restock Form */}
+              {isRestockOpen && (
+                <div className="bg-green-900/20 border border-green-500/30 p-4 rounded-lg">
+                  <h4 className="text-green-300 font-semibold mb-3">Restock Part</h4>
+                  <div className="flex items-center gap-4">
+                    <Input
+                      type="number"
+                      value={restockQuantity}
+                      onChange={e => setRestockQuantity(parseInt(e.target.value))}
+                      min="1"
+                      className="w-32 bg-slate-700"
+                    />
+                    <span className="text-slate-300">items</span>
+                    <Button onClick={handleRestockPart} size="sm">Confirm Restock</Button>
+                    <Button variant="ghost" onClick={() => setIsRestockOpen(false)} size="sm">Cancel</Button>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="movement-history" className="mt-6">
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {partMovements.length > 0 ? partMovements.map(m => (
+                  <div key={m.id} className="bg-slate-700/30 p-4 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className={`p-2 rounded-full ${m.type === 'IN' ? 'bg-green-900/50' : 'bg-red-900/50'}`}>
+                        {m.type === 'IN' ? <PlusCircle className="w-4 h-4 text-green-400" /> : <MinusCircle className="w-4 h-4 text-red-400" />}
+                      </div>
+                      <div>
+                        <p className="text-white">{m.description} <span className={`font-semibold ${m.type === 'IN' ? 'text-green-400' : 'text-red-400'}`}>({m.type === 'IN' ? '+' : '-'}{m.quantity})</span></p>
+                        <p className="text-slate-400 text-sm">by {m.user_name}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-slate-300 text-sm">{format(new Date(m.timestamp), "MMM d, yyyy 'at' hh:mm a")}</p>
+                    </div>
+                  </div>
+                )) : (
+                  <p className="text-slate-400 text-center py-8">No movement history for this part.</p>
+                )}
               </div>
             </TabsContent>
           </Tabs>
         </div>
-        <div className="p-4 border-t border-white/10 flex justify-between items-center">
-          <div>
-            {user.role === 'admin' && (<div className="flex space-x-2"><Button variant="destructive" onClick={() => {onDelete(part.id); onClose();}}>Delete</Button><Button variant="secondary" onClick={() => {onEdit(part); onClose();}}>Edit</Button></div>)}
-          </div>
-          <Button onClick={handleAddToCart} disabled={part.quantity <= 0} className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg disabled:opacity-50 disabled:from-gray-500 disabled:to-gray-600">
-            <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
+
+        {/* Footer Actions */}
+        <div className="flex items-center justify-between p-6 border-t border-slate-600 bg-slate-800/50">
+          <Button variant="ghost" onClick={onClose}>
+            Close
           </Button>
+          <div className="flex gap-2">
+            {user.role === 'admin' && (
+              <Button variant="outline" onClick={() => onEdit(part)}>
+                Edit
+              </Button>
+            )}
+            <Button onClick={handleAddToCart} className="bg-blue-600 hover:bg-blue-700">
+              <ShoppingCart className="w-4 h-4 mr-2" />
+              Add to Cart
+            </Button>
+          </div>
         </div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 };
 
