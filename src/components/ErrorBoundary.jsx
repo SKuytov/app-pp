@@ -41,7 +41,6 @@ class ErrorBoundary extends React.Component {
 
   logErrorToService = async (error, errorInfo) => {
     try {
-      // In production, send to error tracking service (Sentry, LogRocket, etc.)
       const errorData = {
         message: error.message,
         stack: error.stack,
@@ -53,10 +52,8 @@ class ErrorBoundary extends React.Component {
         errorId: this.state.errorId
       };
 
-      // For now, we'll log to console. In production, replace with actual service
       console.log('Error logged:', errorData);
-      
-      // Example: await fetch('/api/log-error', { method: 'POST', body: JSON.stringify(errorData) });
+      // In production, replace with actual error tracking service
     } catch (loggingError) {
       console.error('Failed to log error:', loggingError);
     }
@@ -156,14 +153,6 @@ class ErrorBoundary extends React.Component {
                           {this.state.error.stack}
                         </pre>
                       </div>
-                      {this.state.errorInfo?.componentStack && (
-                        <div>
-                          <h4 className="text-sm font-medium text-red-300">Component Stack:</h4>
-                          <pre className="text-xs text-red-200 mt-1 whitespace-pre-wrap overflow-auto max-h-32">
-                            {this.state.errorInfo.componentStack}
-                          </pre>
-                        </div>
-                      )}
                     </div>
                   </details>
                 </div>
@@ -229,29 +218,5 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
-
-// Higher-order component for easier usage
-export const withErrorBoundary = (Component, errorBoundaryProps = {}) => {
-  const WrappedComponent = (props) => (
-    <ErrorBoundary {...errorBoundaryProps}>
-      <Component {...props} />
-    </ErrorBoundary>
-  );
-  
-  WrappedComponent.displayName = `withErrorBoundary(${Component.displayName || Component.name})`;
-  return WrappedComponent;
-};
-
-// Hook for error reporting from function components
-export const useErrorHandler = () => {
-  const handleError = React.useCallback((error, errorInfo = {}) => {
-    // In function components, we can't use componentDidCatch,
-    // so we'll throw the error to be caught by the nearest ErrorBoundary
-    console.error('Error caught by useErrorHandler:', error);
-    throw error;
-  }, []);
-
-  return handleError;
-};
 
 export default ErrorBoundary;

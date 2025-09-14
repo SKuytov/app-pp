@@ -51,45 +51,4 @@ const LoadingSpinner = ({
   );
 };
 
-// Preset loading components for common use cases
-export const PageLoader = ({ text = 'Loading...' }) => (
-  <div className="min-h-screen flex items-center justify-center bg-slate-900">
-    <LoadingSpinner 
-      size="large" 
-      color="blue" 
-      text={text}
-      className="text-white"
-    />
-  </div>
-);
-
-export const ComponentLoader = ({ text = 'Loading...' }) => (
-  <div className="flex items-center justify-center p-8">
-    <LoadingSpinner 
-      size="medium" 
-      color="blue" 
-      text={text}
-    />
-  </div>
-);
-
-export const ButtonLoader = () => (
-  <LoadingSpinner 
-    size="small" 
-    color="white" 
-    showText={false}
-    className="mr-2"
-  />
-);
-
-export const TableLoader = () => (
-  <div className="flex items-center justify-center py-12">
-    <LoadingSpinner 
-      size="medium" 
-      color="gray" 
-      text="Loading data..."
-    />
-  </div>
-);
-
 export default LoadingSpinner;
