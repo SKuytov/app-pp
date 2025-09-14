@@ -2,29 +2,29 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-const Dashboard = lazy(() => import('@/pages/Dashboard'));
-const Parts = lazy(() => import('@/pages/Parts'));
-const Machines = lazy(() => import('@/pages/Machines'));
-const Orders = lazy(() => import('@/pages/Orders'));
-const Quotations = lazy(() => import('@/pages/Quotations'));
-const Contacts = lazy(() => import('@/pages/Contacts'));
-const Analytics = lazy(() => import('@/pages/Analytics'));
-const Admin = lazy(() => import('@/pages/Admin'));
-const NotFound = lazy(() => import('@/pages/NotFound'));
+const Dashboard = lazy(() => import('@/components/Dashboard/Dashboard'));
+const Inventory = lazy(() => import('@/components/Inventory/InventoryTab'));
+const Machines = lazy(() => import('@/components/Machines/MachinesTab'));
+const Orders = lazy(() => import('@/components/Orders/OrdersTab'));
+const Quotations = lazy(() => import('@/components/Quotations/QuotationsTab'));
+const Contacts = lazy(() => import('@/components/Contacts/ContactsTab'));
+const Analytics = lazy(() => import('@/components/Analytics/AnalyticsTab'));
+const Admin = lazy(() => import('@/components/Admin/AdminTab'));
+const NotFound = lazy(() => import('@/components/Layout/MainLayout')); // fallback to layout if no 404 page
 
 export default function AppRouter() {
   return (
     <Router>
-      <Suspense fallback={<LoadingSpinner size="large" text="Loading…" />}>
+      <Suspense fallback={<LoadingSpinner size="large" text="Loading page..." />}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/parts" element={<Parts />} />
+          <Route path="/inventory" element={<Inventory />} />
           <Route path="/machines" element={<Machines />} />
           <Route path="/orders" element={<Orders />} />
           <Route path="/quotations" element={<Quotations />} />
           <Route path="/contacts" element={<Contacts />} />
-          <Route path="/analytics/*" element={<Analytics />} />
-          <Route path="/admin/*" element={<Admin />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
