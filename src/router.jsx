@@ -11,7 +11,7 @@ export default function AppRouter() {
     <Router>
       <Suspense fallback={<LoadingSpinner size="large" text="Loading..." />}>
         <Routes>
-          <Route path="/*" element={<MainLayout />} />
+          <Route path="/*" element={<App />} />
         </Routes>
       </Suspense>
     </Router>
