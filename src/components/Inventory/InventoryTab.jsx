@@ -3,8 +3,8 @@ import { Search, Plus, Package, AlertTriangle, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import WorldClassPartCard from './WorldClassPartCard';
-import WorldClassPartDetailModal from './WorldClassPartDetailModal';
+import PartCard from './PartCard';
+import PartDetailModal from './PartDetailModal';
 import PartForm from '@/components/Inventory/PartForm';
 import { useToast } from '@/components/ui/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -132,7 +132,7 @@ const WorldClassInventoryTab = ({
       
       return (
         <div style={{ ...style, padding: '8px' }}>
-          <WorldClassPartCard
+          <PartCard
             part={part}
             onEdit={handleEdit}
             onDelete={handleDeleteRequest}
@@ -305,7 +305,7 @@ const WorldClassInventoryTab = ({
           ) : (
             <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
               {displayParts.map((part) => (
-                <WorldClassPartCard
+                <PartCard
                   key={part.id}
                   part={part}
                   onEdit={handleEdit}
@@ -337,7 +337,7 @@ const WorldClassInventoryTab = ({
 
       {/* 🎨 MODALS: Conditional rendering */}
       {selectedPart && (
-        <WorldClassPartDetailModal
+        <PartDetailModal
           isOpen={!!selectedPart}
           onClose={() => setSelectedPart(null)}
           part={selectedPart}
