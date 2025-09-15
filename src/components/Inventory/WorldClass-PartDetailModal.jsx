@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { 
   X, ShoppingCart, Edit2, Trash2, MinusCircle, PlusCircle, 
-  Building2, Calculator, MapPin, Clock, TrendingUp, Activity 
+  Building2, Calculator, MapPin, Clock, TrendingUp, Activity, Package // ← ADD THIS
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,24 +12,14 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { format } from 'date-fns';
 
 const PartDetailModal = ({ 
-  isOpen, 
-  onClose, 
-  part, 
-  onEdit, 
-  onDelete, 
-  user, 
-  movements, 
-  recordPartUsage, 
-  machines, 
-  restockPart, 
-  onAddToCart 
+  isOpen, onClose, part, onEdit, onDelete, user, movements, 
+  recordPartUsage, machines, restockPart, onAddToCart 
 }) => {
   const { toast } = useToast();
   const { formatCurrency } = useCurrency();
   const [useQuantity, setUseQuantity] = useState(1);
   const [restockQuantity, setRestockQuantity] = useState(1);
   const [selectedMachine, setSelectedMachine] = useState('');
-  const [activeSection, setActiveSection] = useState('overview');
 
   // Enhanced consumption analysis
   const partData = useMemo(() => {
@@ -187,8 +177,29 @@ const PartDetailModal = ({
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            {/* Left Column - Part Info & Metrics */}
+            {/* Left Column - Part Info & Image */}
             <div className="lg:col-span-2 space-y-6">
+              
+              {/* Part Image */}
+              <div className="bg-slate-750 rounded-lg p-4">
+                <div className="aspect-video bg-slate-700 rounded-lg flex items-center justify-center">
+                  {part.image_url ? (
+                    <img 
+                      src={part.image_url} 
+                      alt={part.name} 
+                      className="max-w-full max-h-full object-contain rounded"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div className={`flex flex-col items-center justify-center text-slate-400 ${part.image_url ? 'hidden' : 'flex'}`}>
+                    <Package className="h-12 w-12 mb-2" />
+                    <span className="text-sm">No image available</span>
+                  </div>
+                </div>
+              </div>
               
               {/* Key Metrics */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
