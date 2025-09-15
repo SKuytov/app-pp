@@ -353,12 +353,12 @@ const WorldClassInventoryTab = ({
       )}
 
       {isFormOpen && (
-        <PartForm
-          title={editingPart ? 'Edit Part' : 'Add New Part'}
-          initialData={editingPart}
-          onSubmit={handleFormSubmit}
-          onCancel={() => { setEditingPart(null); setIsFormOpen(false); }}
-        />
+      <PartForm
+        title={editingPart ? 'Edit Part' : 'Add New Part'}
+        part={editingPart}
+        onSubmit={handleFormSubmit}
+        onClose={() => { setEditingPart(null); setIsFormOpen(false); }}
+      />
       )}
 
       {deletingPart && (

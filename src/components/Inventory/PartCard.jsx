@@ -61,9 +61,9 @@ const PartCard = memo(({ part, onEdit, onDelete, user, onAddToCart, onViewDetail
       statusColor, 
       statusBg, 
       statusIcon, 
-      consumptionPattern,
-      reorderLevel,
-      effectiveWeeklyUsage
+      consumptionPattern, 
+      reorderLevel, 
+      effectiveWeeklyUsage 
     };
   }, [
     part.quantity,
@@ -121,6 +121,25 @@ const PartCard = memo(({ part, onEdit, onDelete, user, onAddToCart, onViewDetail
           >
             <Trash2 className="h-3 w-3" />
           </Button>
+        </div>
+      </div>
+
+      {/* Part Image */}
+      <div className="mb-3 aspect-video bg-slate-700 rounded-lg flex items-center justify-center overflow-hidden">
+        {part.image_url ? (
+          <img 
+            src={part.image_url} 
+            alt={part.name} 
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'flex';
+            }}
+          />
+        ) : null}
+        <div className={`flex flex-col items-center justify-center text-slate-400 ${part.image_url ? 'hidden' : 'flex'}`}>
+          <Package className="h-8 w-8 mb-2" />
+          <span className="text-xs">No image</span>
         </div>
       </div>
 
