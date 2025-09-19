@@ -2,38 +2,69 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, UploadCloud, Image as ImageIcon, Trash2, Building2, Calculator, TrendingUp, X, Sparkles, Zap } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
+import { Loader2, UploadCloud, Image as ImageIcon, Trash2, Building2, Calculator, TrendingUp, X, Sparkles, Zap, AlertTriangle } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
 
+// 🔧 FIXED: Safe file upload component with proper error handling
 const PremiumFileUploader = ({ onFileSelect, initialFileUrl, fileType, icon: Icon }) => {
   const [preview, setPreview] = useState(initialFileUrl);
   const [fileName, setFileName] = useState(initialFileUrl ? initialFileUrl.split('/').pop() : '');
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   const onDrop = useCallback(acceptedFiles => {
     if (acceptedFiles && acceptedFiles.length > 0) {
-      const file = acceptedFiles[0];
+      const file = acceptedFiles;
       setIsUploading(true);
+      setUploadError('');
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError('File size must be less than 5MB');
+        setIsUploading(false);
+        return;
+      }
+
+      // Validate file type
+      const allowedTypes = fileType === 'image' 
+        ? ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+        : ['application/pdf', 'application/dwg', 'model/step', 'model/iges'];
+      
+      if (!allowedTypes.includes(file.type)) {
+        setUploadError(`Invalid file type. Allowed: ${allowedTypes.join(', ')}`);
+        setIsUploading(false);
+        return;
+      }
       
       setTimeout(() => {
-        onFileSelect(file);
-        if (file.type.startsWith('image/')) {
-          const previewUrl = URL.createObjectURL(file);
-          setPreview(previewUrl);
-        } else {
-          setPreview(null);
+        try {
+          onFileSelect(file);
+          if (file.type.startsWith('image/')) {
+            const previewUrl = URL.createObjectURL(file);
+            setPreview(previewUrl);
+          } else {
+            setPreview(null);
+          }
+          setFileName(file.name);
+          setIsUploading(false);
+        } catch (error) {
+          console.error('File upload error:', error);
+          setUploadError('Failed to process file');
+          setIsUploading(false);
         }
-        setFileName(file.name);
-        setIsUploading(false);
       }, 800);
     }
-  }, [onFileSelect]);
+  }, [onFileSelect, fileType]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     multiple: false,
+    disabled: isUploading
   });
 
   useEffect(() => {
@@ -51,84 +82,163 @@ const PremiumFileUploader = ({ onFileSelect, initialFileUrl, fileType, icon: Ico
     onFileSelect(null);
     setPreview(null);
     setFileName('');
+    setUploadError('');
   };
 
   return (
-    <div
-      {...getRootProps()}
-      className={`group relative border-2 border-dashed rounded-2xl p-6 transition-all duration-300 cursor-pointer overflow-hidden ${
-        isDragActive 
-          ? 'border-blue-400 bg-gradient-to-br from-blue-900/20 to-purple-900/20 scale-105' 
-          : 'border-slate-600 hover:border-slate-400 hover:bg-slate-700/20'
-      }`}
-    >
-      <input {...getInputProps()} />
-      
-      {/* Animated Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 via-transparent to-purple-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      
-      {isUploading ? (
-        <motion.div 
-          className="text-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            className="mx-auto mb-4 w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full"
-          />
-          <p className="text-blue-400 font-medium">Uploading...</p>
-        </motion.div>
-      ) : fileName ? (
-        <div className="text-center relative z-10">
-          <div className="mb-4">
-            {preview ? (
-              <img src={preview} alt="Preview" className="mx-auto h-20 w-20 object-cover rounded-xl shadow-lg" />
-            ) : (
-              <div className="mx-auto w-20 h-20 bg-slate-600/30 rounded-xl flex items-center justify-center">
-                <Icon className="w-8 h-8 text-slate-400" />
-              </div>
-            )}
-          </div>
-          <p className="text-slate-200 font-medium mb-2">{fileName}</p>
-          <p className="text-slate-400 text-sm mb-3">Drop a new file or click to replace</p>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleRemove}
-            className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-          >
-            <Trash2 className="w-4 h-4 mr-1" />
-            Remove
-          </Button>
-        </div>
-      ) : (
-        <div className="text-center relative z-10">
-          <motion.div
-            animate={{ y: [0, -10, 0] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="mb-4"
-          >
-            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-slate-600/30 to-slate-700/30 rounded-2xl flex items-center justify-center shadow-lg">
-              <Icon className="w-8 h-8 text-slate-400" />
+    <div className="space-y-2">
+      <div 
+        {...getRootProps()} 
+        className={`relative border-2 border-dashed rounded-lg p-6 transition-all cursor-pointer
+          ${isDragActive 
+            ? 'border-blue-500 bg-blue-500/10' 
+            : isUploading 
+            ? 'border-gray-400 bg-gray-100 cursor-not-allowed'
+            : uploadError
+            ? 'border-red-500 bg-red-500/10'
+            : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+          }`}
+      >
+        <input {...getInputProps()} />
+        
+        {/* Animated Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 rounded-lg" />
+        
+        <div className="relative text-center">
+          {isUploading ? (
+            <div className="space-y-2">
+              <Loader2 className="w-8 h-8 mx-auto animate-spin text-blue-500" />
+              <p className="text-sm text-gray-600">Uploading...</p>
             </div>
-          </motion.div>
-          <p className="text-slate-200 font-medium text-lg mb-2">Upload {fileType}</p>
-          <p className="text-slate-400 text-sm">
-            {isDragActive ? 'Drop your file here...' : 'Drag & drop or click to browse'}
-          </p>
+          ) : fileName ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-center">
+                {preview ? (
+                  <img src={preview} alt="Preview" className="w-16 h-16 object-cover rounded" />
+                ) : (
+                  <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
+                    <Icon className="w-8 h-8 text-gray-500" />
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="font-medium text-gray-800">{fileName}</p>
+                <p className="text-xs text-gray-500">Drop a new file or click to replace</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleRemove}
+                className="text-red-600 hover:text-red-700"
+              >
+                <Trash2 className="w-4 h-4 mr-1" />
+                Remove
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-center">
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <Icon className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+              <div>
+                <p className="font-medium text-gray-800">Upload {fileType}</p>
+                <p className="text-sm text-gray-500">
+                  {isDragActive ? 'Drop your file here...' : 'Drag & drop or click to browse'}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {uploadError && (
+        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-2 rounded">
+          <AlertTriangle className="w-4 h-4" />
+          {uploadError}
         </div>
       )}
     </div>
   );
 };
 
+// 🚀 FIXED: Enhanced form validation and data handling
+const validatePartData = (formData) => {
+  const errors = {};
+  
+  // Required fields validation
+  if (!formData.name?.trim()) errors.name = 'Part name is required';
+  if (!formData.part_number?.trim()) errors.part_number = 'Part number is required';
+  if (formData.quantity === '' || formData.quantity < 0) errors.quantity = 'Valid quantity is required';
+  if (formData.price === '' || formData.price < 0) errors.price = 'Valid price is required';
+  
+  // Data type validation
+  const numericFields = ['quantity', 'min_stock', 'price', 'weekly_usage', 'monthly_usage', 'lead_time_weeks', 'safety_stock'];
+  numericFields.forEach(field => {
+    if (formData[field] !== '' && (isNaN(Number(formData[field])) || Number(formData[field]) < 0)) {
+      errors[field] = `${field.replace('_', ' ')} must be a valid positive number`;
+    }
+  });
+
+  // Business logic validation
+  if (formData.min_stock !== '' && formData.quantity !== '' && Number(formData.min_stock) > Number(formData.quantity)) {
+    errors.min_stock = 'Minimum stock cannot be higher than current quantity';
+  }
+  
+  // Usage pattern validation
+  if (formData.weekly_usage && formData.monthly_usage) {
+    errors.usage = 'Please set either weekly OR monthly usage, not both';
+  }
+
+  return errors;
+};
+
+// 🔧 FIXED: Sanitize data for API submission
+const sanitizeFormData = (formData, imageFile, cadFile) => {
+  const sanitized = {};
+  
+  // Convert empty strings to null for optional numeric fields
+  const optionalNumericFields = ['min_stock', 'weekly_usage', 'monthly_usage', 'lead_time_weeks', 'safety_stock'];
+  
+  Object.keys(formData).forEach(key => {
+    let value = formData[key];
+    
+    // Handle empty strings
+    if (value === '') {
+      sanitized[key] = optionalNumericFields.includes(key) ? null : '';
+      return;
+    }
+    
+    // Convert numeric fields
+    if (['quantity', 'price', 'min_stock', 'weekly_usage', 'monthly_usage', 'lead_time_weeks', 'safety_stock'].includes(key)) {
+      const numValue = Number(value);
+      sanitized[key] = isNaN(numValue) ? null : numValue;
+    } else {
+      sanitized[key] = String(value).trim();
+    }
+  });
+
+  // Handle files properly - don't include in main data
+  // Files should be handled separately in the upload process
+  if (imageFile && imageFile !== formData.image_url) {
+    sanitized._hasNewImageFile = true;
+  }
+  
+  if (cadFile && cadFile !== formData.cad_url) {
+    sanitized._hasNewCadFile = true;
+  }
+
+  return sanitized;
+};
+
 const WorldBestPartForm = ({ onSubmit, onCancel, title, initialData = null }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { currency } = useCurrency();
+  const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
+  const [formErrors, setFormErrors] = useState({});
   const [formData, setFormData] = useState({
     name: '', 
     part_number: '', 
@@ -151,63 +261,126 @@ const WorldBestPartForm = ({ onSubmit, onCancel, title, initialData = null }) =>
   const [imageFile, setImageFile] = useState(null);
   const [cadFile, setCadFile] = useState(null);
 
+  // 🔧 FIXED: Safe calculations with error handling
   const calculatedReorderLevel = React.useMemo(() => {
-    const weeklyUsage = parseFloat(formData.weekly_usage) || 0;
-    const monthlyUsage = parseFloat(formData.monthly_usage) || 0;
-    const leadTimeWeeks = parseFloat(formData.lead_time_weeks) || 0;
-    const safetyStock = parseFloat(formData.safety_stock) || 0;
-    
-    const effectiveWeeklyUsage = weeklyUsage || (monthlyUsage / 4.33);
-    
-    if (effectiveWeeklyUsage > 0 && leadTimeWeeks > 0) {
-      return Math.ceil((effectiveWeeklyUsage * leadTimeWeeks) + safetyStock);
+    try {
+      const weeklyUsage = parseFloat(formData.weekly_usage) || 0;
+      const monthlyUsage = parseFloat(formData.monthly_usage) || 0;
+      const leadTimeWeeks = parseFloat(formData.lead_time_weeks) || 0;
+      const safetyStock = parseFloat(formData.safety_stock) || 0;
+      
+      const effectiveWeeklyUsage = weeklyUsage || (monthlyUsage / 4.33);
+      
+      if (effectiveWeeklyUsage > 0 && leadTimeWeeks > 0) {
+        return Math.ceil((effectiveWeeklyUsage * leadTimeWeeks) + safetyStock);
+      }
+      return 0;
+    } catch (error) {
+      console.error('Error calculating reorder level:', error);
+      return 0;
     }
-    return 0;
   }, [formData.weekly_usage, formData.monthly_usage, formData.lead_time_weeks, formData.safety_stock]);
 
   const totalValue = React.useMemo(() => {
-    const quantity = parseFloat(formData.quantity) || 0;
-    const price = parseFloat(formData.price) || 0;
-    return quantity * price;
+    try {
+      const quantity = parseFloat(formData.quantity) || 0;
+      const price = parseFloat(formData.price) || 0;
+      return quantity * price;
+    } catch (error) {
+      console.error('Error calculating total value:', error);
+      return 0;
+    }
   }, [formData.quantity, formData.price]);
 
   useEffect(() => {
     if (initialData) {
-      setFormData({
-        id: initialData.id || undefined,
-        name: initialData.name || '',
-        part_number: initialData.part_number || '',
-        supplier_id: initialData.supplier_id || '',
-        supplier: initialData.supplier || '',
-        main_group: initialData.main_group || '',
-        sub_group: initialData.sub_group || '',
-        quantity: initialData.quantity || '',
-        min_stock: initialData.min_stock || '',
-        price: initialData.price || '',
-        location: initialData.location || '',
-        criticality: initialData.criticality || 'C',
-        weekly_usage: initialData.weekly_usage || '',
-        monthly_usage: initialData.monthly_usage || '',
-        lead_time_weeks: initialData.lead_time_weeks || '',
-        safety_stock: initialData.safety_stock || '',
-        image_url: initialData.image_url || '',
-        cad_url: initialData.cad_url || '',
+      const safeInitialData = {};
+      Object.keys(formData).forEach(key => {
+        safeInitialData[key] = initialData[key] !== undefined ? String(initialData[key]) : '';
       });
+      
+      if (initialData.id) safeInitialData.id = initialData.id;
+      
+      setFormData(safeInitialData);
       setImageFile(initialData.image_url);
       setCadFile(initialData.cad_url);
     }
   }, [initialData]);
 
+  // 🚀 FIXED: Enhanced form submission with proper error handling
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate form data
+    const errors = validatePartData(formData);
+    setFormErrors(errors);
+    
+    if (Object.keys(errors).length > 0) {
+      toast({ 
+        variant: "destructive", 
+        title: "Validation Error", 
+        description: "Please fix the form errors before submitting." 
+      });
+      return;
+    }
+
     setIsSubmitting(true);
-    await onSubmit({ ...formData, imageFile, cadFile });
-    setIsSubmitting(false);
+    
+    try {
+      // Sanitize data for API
+      const sanitizedData = sanitizeFormData(formData, imageFile, cadFile);
+      
+      // Prepare submission data
+      const submissionData = {
+        ...sanitizedData,
+        imageFile: imageFile !== formData.image_url ? imageFile : null,
+        cadFile: cadFile !== formData.cad_url ? cadFile : null
+      };
+
+      const result = await onSubmit(submissionData);
+      
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+      
+      toast({ 
+        title: "Success", 
+        description: `Part ${initialData ? 'updated' : 'created'} successfully.` 
+      });
+      
+    } catch (error) {
+      console.error('Form submission error:', error);
+      let errorMessage = 'An unexpected error occurred';
+      
+      // Handle specific error types
+      if (error.message?.includes('duplicate')) {
+        errorMessage = 'A part with this part number already exists';
+      } else if (error.message?.includes('validation')) {
+        errorMessage = 'Please check your input data';
+      } else if (error.message?.includes('network')) {
+        errorMessage = 'Network error. Please check your connection';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast({ 
+        variant: "destructive", 
+        title: "Error", 
+        description: errorMessage 
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({...prev, [name]: value}));
+    
+    // Clear specific field error when user starts typing
+    if (formErrors[name]) {
+      setFormErrors(prev => ({...prev, [name]: ''}));
+    }
   };
 
   const steps = [
@@ -220,146 +393,150 @@ const WorldBestPartForm = ({ onSubmit, onCancel, title, initialData = null }) =>
 
   const isStepValid = (step) => {
     const stepFields = steps[step - 1]?.fields || [];
-    if (step === 1) return formData.name && formData.part_number;
-    if (step === 3) return formData.quantity !== '' && formData.price !== '';
-    return true;
+    if (step === 1) return formData.name && formData.part_number && !formErrors.name && !formErrors.part_number;
+    if (step === 3) return formData.quantity !== '' && formData.price !== '' && !formErrors.quantity && !formErrors.price;
+    return stepFields.every(field => !formErrors[field]);
   };
 
+  const canProceedToNextStep = isStepValid(currentStep);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <motion.div
-        className="bg-gradient-to-br from-slate-800/95 to-slate-900/95 backdrop-blur-xl rounded-3xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden border border-slate-600/50"
-        initial={{ scale: 0.9, opacity: 0, y: 20 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      >
+    <Dialog open={true} onOpenChange={onCancel}>
+      <DialogContent className="max-w-4xl max-h-[90vh] bg-white p-0 overflow-hidden">
+        <DialogTitle className="sr-only">
+          {title || 'Part Form'}
+        </DialogTitle>
+        
+        <VisuallyHidden>
+          <DialogDescription>
+            {initialData ? 'Edit existing part details' : 'Create a new part in the inventory system'}
+          </DialogDescription>
+        </VisuallyHidden>
+
         {/* Premium Header */}
-        <div className="relative p-6 border-b border-slate-600/50 bg-gradient-to-r from-slate-800/50 to-slate-700/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <motion.div
-                className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center"
-                whileHover={{ scale: 1.1, rotate: 5 }}
-              >
-                <Sparkles className="w-6 h-6 text-white" />
-              </motion.div>
+        <div className="relative bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-white">
+          <div className="absolute inset-0 bg-black/20" />
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <Sparkles className="w-6 h-6" />
+              </div>
               <div>
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
-                  {title}
-                </h2>
-                <p className="text-slate-400 mt-1">Step {currentStep} of {steps.length}</p>
+                <h2 className="text-2xl font-bold">{title}</h2>
+                <p className="text-blue-100">Step {currentStep} of {steps.length}</p>
               </div>
             </div>
-            <Button 
-              variant="ghost" 
-              onClick={onCancel}
-              className="text-slate-400 hover:text-white hover:bg-slate-700 rounded-full p-2"
-            >
-              <X size={20} />
+            
+            <Button variant="ghost" size="sm" onClick={onCancel} className="text-white hover:bg-white/20">
+              <X className="w-4 h-4" />
             </Button>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="mt-6">
-            <div className="flex justify-between mb-2">
-              {steps.map((step, index) => (
-                <div key={index} className="flex items-center">
-                  <motion.div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
-                      currentStep > index + 1
-                        ? 'bg-green-500 text-white'
-                        : currentStep === index + 1
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-600 text-slate-300'
-                    }`}
-                    whileHover={{ scale: 1.1 }}
-                  >
-                    {currentStep > index + 1 ? '✓' : step.icon}
-                  </motion.div>
-                  {index < steps.length - 1 && (
-                    <div className={`w-20 h-1 mx-2 transition-all duration-300 ${
-                      currentStep > index + 1 ? 'bg-green-500' : 'bg-slate-600'
-                    }`} />
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="text-center">
-              <span className="text-slate-300 font-medium">{steps[currentStep - 1]?.title}</span>
-            </div>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6">
-          <AnimatePresence mode="wait">
+        {/* Progress Bar */}
+        <div className="px-6 py-4 bg-gray-50 border-b">
+          <div className="flex items-center justify-between">
+            {steps.map((step, index) => (
+              <React.Fragment key={index}>
+                <motion.div
+                  className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold ${
+                    currentStep > index + 1
+                      ? 'bg-green-500 text-white'
+                      : currentStep === index + 1
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-300 text-gray-600'
+                  }`}
+                  whileHover={{ scale: 1.1 }}
+                >
+                  {currentStep > index + 1 ? '✓' : step.icon}
+                </motion.div>
+                {index < steps.length - 1 && (
+                  <div className={`flex-1 h-1 mx-2 rounded ${
+                    currentStep > index + 1 ? 'bg-green-500' : 'bg-gray-300'
+                  }`} />
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+          <p className="text-center mt-2 text-sm text-gray-600">
+            {steps[currentStep - 1]?.title}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+          <div className="p-6 space-y-6">
+            
             {/* Step 1: Basic Information */}
             {currentStep === 1 && (
               <motion.div
-                key="step1"
-                initial={{ opacity: 0, x: 50 }}
+                initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
                 className="space-y-6"
               >
-                <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-white mb-2">Basic Information</h3>
-                  <p className="text-slate-400">Let's start with the essentials</p>
+                <div className="text-center space-y-2">
+                  <h3 className="text-xl font-semibold text-gray-800">Basic Information</h3>
+                  <p className="text-gray-600">Let's start with the essentials</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-slate-300 text-lg">Part Name *</Label>
+                    <Label htmlFor="name">Part Name *</Label>
                     <Input
+                      id="name"
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
-                      className="bg-slate-700/50 border-slate-600 text-white h-12 text-lg"
                       placeholder="Enter part name"
-                      required
+                      className={formErrors.name ? 'border-red-500' : ''}
                     />
+                    {formErrors.name && <p className="text-sm text-red-600">{formErrors.name}</p>}
                   </div>
+                  
                   <div className="space-y-2">
-                    <Label className="text-slate-300 text-lg">Part Number *</Label>
+                    <Label htmlFor="part_number">Part Number *</Label>
                     <Input
+                      id="part_number"
                       name="part_number"
                       value={formData.part_number}
                       onChange={handleChange}
-                      className="bg-slate-700/50 border-slate-600 text-white font-mono h-12 text-lg"
-                      placeholder="e.g., 100004"
-                      required
+                      placeholder="Enter part number"
+                      className={formErrors.part_number ? 'border-red-500' : ''}
                     />
+                    {formErrors.part_number && <p className="text-sm text-red-600">{formErrors.part_number}</p>}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-slate-300">Main Group</Label>
+                    <Label htmlFor="main_group">Main Group</Label>
                     <Input
+                      id="main_group"
                       name="main_group"
                       value={formData.main_group}
                       onChange={handleChange}
-                      className="bg-slate-700/50 border-slate-600 text-white h-12"
-                      placeholder="Category"
+                      placeholder="e.g., Electronics"
                     />
                   </div>
+                  
                   <div className="space-y-2">
-                    <Label className="text-slate-300">Sub Group</Label>
+                    <Label htmlFor="sub_group">Sub Group</Label>
                     <Input
+                      id="sub_group"
                       name="sub_group"
                       value={formData.sub_group}
                       onChange={handleChange}
-                      className="bg-slate-700/50 border-slate-600 text-white h-12"
-                      placeholder="Sub-category"
+                      placeholder="e.g., Sensors"
                     />
                   </div>
+                  
                   <div className="space-y-2">
-                    <Label className="text-slate-300">Criticality</Label>
+                    <Label htmlFor="criticality">Criticality</Label>
                     <select
+                      id="criticality"
                       name="criticality"
                       value={formData.criticality}
                       onChange={handleChange}
-                      className="w-full p-3 bg-slate-700/50 border border-slate-600 text-white rounded-md h-12 text-lg"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="A">A - Critical</option>
                       <option value="B">B - Important</option>
@@ -373,55 +550,51 @@ const WorldBestPartForm = ({ onSubmit, onCancel, title, initialData = null }) =>
             {/* Step 2: Supplier Information */}
             {currentStep === 2 && (
               <motion.div
-                key="step2"
-                initial={{ opacity: 0, x: 50 }}
+                initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
                 className="space-y-6"
               >
-                <div className="text-center mb-8">
-                  <div className="flex items-center justify-center gap-2 mb-4">
-                    <Building2 className="w-8 h-8 text-blue-400" />
-                    <h3 className="text-2xl font-bold text-white">Supplier Information</h3>
+                <div className="text-center space-y-2">
+                  <div className="flex items-center justify-center">
+                    <Building2 className="w-8 h-8 text-blue-600" />
                   </div>
-                  <p className="text-slate-400">Connect this part to its supplier</p>
+                  <h3 className="text-xl font-semibold text-gray-800">Supplier Information</h3>
+                  <p className="text-gray-600">Connect this part to its supplier</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-slate-300 text-lg">Supplier ID</Label>
+                    <Label htmlFor="supplier_id">Supplier ID</Label>
                     <Input
+                      id="supplier_id"
                       name="supplier_id"
                       value={formData.supplier_id}
                       onChange={handleChange}
-                      className="bg-slate-700/50 border-slate-600 text-white font-mono h-12 text-lg"
-                      placeholder="e.g., 2123071"
+                      placeholder="External supplier identifier"
                     />
-                    <p className="text-slate-400 text-sm">External supplier identifier</p>
                   </div>
+                  
                   <div className="space-y-2">
-                    <Label className="text-slate-300 text-lg">Supplier Name</Label>
+                    <Label htmlFor="supplier">Supplier Name</Label>
                     <Input
+                      id="supplier"
                       name="supplier"
                       value={formData.supplier}
                       onChange={handleChange}
-                      className="bg-slate-700/50 border-slate-600 text-white h-12 text-lg"
-                      placeholder="e.g., FESTO"
+                      placeholder="Company or supplier name"
                     />
-                    <p className="text-slate-400 text-sm">Company or supplier name</p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-slate-300 text-lg">Storage Location</Label>
+                  <Label htmlFor="location">Storage Location</Label>
                   <Input
+                    id="location"
                     name="location"
                     value={formData.location}
                     onChange={handleChange}
-                    className="bg-slate-700/50 border-slate-600 text-white h-12 text-lg"
-                    placeholder="e.g., C3-3, Warehouse A, Shelf 15"
+                    placeholder="Physical location where this part is stored"
                   />
-                  <p className="text-slate-400 text-sm">Physical location where this part is stored</p>
                 </div>
               </motion.div>
             )}
@@ -429,76 +602,78 @@ const WorldBestPartForm = ({ onSubmit, onCancel, title, initialData = null }) =>
             {/* Step 3: Inventory & Pricing */}
             {currentStep === 3 && (
               <motion.div
-                key="step3"
-                initial={{ opacity: 0, x: 50 }}
+                initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
                 className="space-y-6"
               >
-                <div className="text-center mb-8">
-                  <div className="flex items-center justify-center gap-2 mb-4">
-                    <Calculator className="w-8 h-8 text-green-400" />
-                    <h3 className="text-2xl font-bold text-white">Inventory & Pricing</h3>
+                <div className="text-center space-y-2">
+                  <div className="flex items-center justify-center">
+                    <Calculator className="w-8 h-8 text-green-600" />
                   </div>
-                  <p className="text-slate-400">Set quantities and pricing information</p>
+                  <h3 className="text-xl font-semibold text-gray-800">Inventory & Pricing</h3>
+                  <p className="text-gray-600">Set quantities and pricing information</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-slate-300 text-lg">Current Quantity *</Label>
+                    <Label htmlFor="quantity">Current Quantity *</Label>
                     <Input
+                      id="quantity"
                       name="quantity"
                       type="number"
+                      min="0"
+                      step="1"
                       value={formData.quantity}
                       onChange={handleChange}
-                      className="bg-slate-700/50 border-slate-600 text-white h-12 text-lg"
                       placeholder="0"
-                      min="0"
-                      required
+                      className={formErrors.quantity ? 'border-red-500' : ''}
                     />
+                    {formErrors.quantity && <p className="text-sm text-red-600">{formErrors.quantity}</p>}
                   </div>
+                  
                   <div className="space-y-2">
-                    <Label className="text-slate-300 text-lg">Minimum Stock</Label>
+                    <Label htmlFor="min_stock">Minimum Stock</Label>
                     <Input
+                      id="min_stock"
                       name="min_stock"
                       type="number"
+                      min="0"
+                      step="1"
                       value={formData.min_stock}
                       onChange={handleChange}
-                      className="bg-slate-700/50 border-slate-600 text-white h-12 text-lg"
                       placeholder="0"
-                      min="0"
+                      className={formErrors.min_stock ? 'border-red-500' : ''}
                     />
+                    {formErrors.min_stock && <p className="text-sm text-red-600">{formErrors.min_stock}</p>}
                   </div>
+                  
                   <div className="space-y-2">
-                    <Label className="text-slate-300 text-lg">Price per 1 pcs ({currency}) *</Label>
+                    <Label htmlFor="price">Price per 1 pcs ({currency}) *</Label>
                     <Input
+                      id="price"
                       name="price"
                       type="number"
+                      min="0"
                       step="0.01"
                       value={formData.price}
                       onChange={handleChange}
-                      className="bg-slate-700/50 border-slate-600 text-white h-12 text-lg"
                       placeholder="0.00"
-                      min="0"
-                      required
+                      className={formErrors.price ? 'border-red-500' : ''}
                     />
+                    {formErrors.price && <p className="text-sm text-red-600">{formErrors.price}</p>}
                   </div>
                 </div>
 
                 {totalValue > 0 && (
-                  <motion.div 
-                    className="p-6 rounded-2xl bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-500/30"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                  >
-                    <div className="text-center">
-                      <Zap className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                      <p className="text-green-300 text-lg font-medium mb-2">Total Inventory Value</p>
-                      <p className="text-green-400 text-3xl font-bold">
-                        {formData.quantity} pcs × {currency} {formData.price} = {currency} {totalValue.toFixed(2)}
-                      </p>
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2">
+                      <Calculator className="w-5 h-5 text-blue-600" />
+                      <h4 className="font-semibold text-blue-900">Total Inventory Value</h4>
                     </div>
-                  </motion.div>
+                    <p className="text-blue-700 mt-1">
+                      {formData.quantity} pcs × {currency} {formData.price} = {currency} {totalValue.toFixed(2)}
+                    </p>
+                  </div>
                 )}
               </motion.div>
             )}
@@ -506,98 +681,102 @@ const WorldBestPartForm = ({ onSubmit, onCancel, title, initialData = null }) =>
             {/* Step 4: Consumption Pattern */}
             {currentStep === 4 && (
               <motion.div
-                key="step4"
-                initial={{ opacity: 0, x: 50 }}
+                initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
                 className="space-y-6"
               >
-                <div className="text-center mb-8">
-                  <div className="flex items-center justify-center gap-2 mb-4">
-                    <TrendingUp className="w-8 h-8 text-purple-400" />
-                    <h3 className="text-2xl font-bold text-white">Consumption Pattern</h3>
+                <div className="text-center space-y-2">
+                  <div className="flex items-center justify-center">
+                    <TrendingUp className="w-8 h-8 text-purple-600" />
                   </div>
-                  <p className="text-slate-400">Configure reorder level calculations</p>
+                  <h3 className="text-xl font-semibold text-gray-800">Consumption Pattern</h3>
+                  <p className="text-gray-600">Configure reorder level calculations</p>
                 </div>
 
-                <div className="bg-purple-900/10 border border-purple-500/20 p-6 rounded-2xl">
-                  <p className="text-purple-300 text-center mb-6">Set either weekly OR monthly usage (not both)</p>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                  <p className="text-sm text-yellow-800">Set either weekly OR monthly usage (not both)</p>
+                </div>
+                {formErrors.usage && <p className="text-sm text-red-600">{formErrors.usage}</p>}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label className="text-slate-300 text-lg">Weekly Usage (pieces)</Label>
+                      <Label htmlFor="weekly_usage">Weekly Usage (pieces)</Label>
                       <Input
+                        id="weekly_usage"
                         name="weekly_usage"
                         type="number"
-                        step="0.1"
+                        min="0"
+                        step="1"
                         value={formData.weekly_usage}
                         onChange={handleChange}
-                        className="bg-slate-700/50 border-slate-600 text-white h-12 text-lg"
-                        placeholder="0"
-                        min="0"
+                        placeholder="Average pieces used per week"
+                        className={formErrors.weekly_usage ? 'border-red-500' : ''}
                       />
-                      <p className="text-slate-400 text-sm">Average pieces used per week</p>
+                      {formErrors.weekly_usage && <p className="text-sm text-red-600">{formErrors.weekly_usage}</p>}
                     </div>
+                    
                     <div className="space-y-2">
-                      <Label className="text-slate-300 text-lg">Monthly Usage (pieces)</Label>
+                      <Label htmlFor="monthly_usage">Monthly Usage (pieces)</Label>
                       <Input
+                        id="monthly_usage"
                         name="monthly_usage"
                         type="number"
-                        step="0.1"
+                        min="0"
+                        step="1"
                         value={formData.monthly_usage}
                         onChange={handleChange}
-                        className="bg-slate-700/50 border-slate-600 text-white h-12 text-lg"
-                        placeholder="0"
-                        min="0"
+                        placeholder="Average pieces used per month"
+                        className={formErrors.monthly_usage ? 'border-red-500' : ''}
                       />
-                      <p className="text-slate-400 text-sm">Average pieces used per month</p>
+                      {formErrors.monthly_usage && <p className="text-sm text-red-600">{formErrors.monthly_usage}</p>}
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label className="text-slate-300 text-lg">Lead Time (Weeks)</Label>
+                      <Label htmlFor="lead_time_weeks">Lead Time (Weeks)</Label>
                       <Input
+                        id="lead_time_weeks"
                         name="lead_time_weeks"
                         type="number"
+                        min="0"
                         step="0.5"
                         value={formData.lead_time_weeks}
                         onChange={handleChange}
-                        className="bg-slate-700/50 border-slate-600 text-white h-12 text-lg"
-                        placeholder="2"
-                        min="0"
+                        placeholder="Weeks from order to delivery"
+                        className={formErrors.lead_time_weeks ? 'border-red-500' : ''}
                       />
-                      <p className="text-slate-400 text-sm">Weeks from order to delivery</p>
+                      {formErrors.lead_time_weeks && <p className="text-sm text-red-600">{formErrors.lead_time_weeks}</p>}
                     </div>
+                    
                     <div className="space-y-2">
-                      <Label className="text-slate-300 text-lg">Safety Stock</Label>
+                      <Label htmlFor="safety_stock">Safety Stock</Label>
                       <Input
+                        id="safety_stock"
                         name="safety_stock"
                         type="number"
+                        min="0"
+                        step="1"
                         value={formData.safety_stock}
                         onChange={handleChange}
-                        className="bg-slate-700/50 border-slate-600 text-white h-12 text-lg"
-                        placeholder="0"
-                        min="0"
+                        placeholder="Buffer stock for uncertainties"
+                        className={formErrors.safety_stock ? 'border-red-500' : ''}
                       />
-                      <p className="text-slate-400 text-sm">Buffer stock for uncertainties</p>
+                      {formErrors.safety_stock && <p className="text-sm text-red-600">{formErrors.safety_stock}</p>}
                     </div>
                   </div>
                 </div>
 
                 {calculatedReorderLevel > 0 && (
-                  <motion.div 
-                    className="p-6 rounded-2xl bg-gradient-to-br from-orange-900/20 to-red-900/20 border border-orange-500/30"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                  >
-                    <div className="text-center">
-                      <TrendingUp className="w-8 h-8 text-orange-400 mx-auto mb-2" />
-                      <p className="text-orange-300 text-lg font-medium mb-2">Calculated Reorder Level</p>
-                      <p className="text-orange-400 text-4xl font-bold mb-2">{calculatedReorderLevel} pieces</p>
-                      <p className="text-orange-300 text-sm">Reorder when stock reaches this level</p>
+                  <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-green-600" />
+                      <h4 className="font-semibold text-green-900">Calculated Reorder Level</h4>
                     </div>
-                  </motion.div>
+                    <p className="text-2xl font-bold text-green-700 mt-1">{calculatedReorderLevel} pieces</p>
+                    <p className="text-green-600 text-sm">Reorder when stock reaches this level</p>
+                  </div>
                 )}
               </motion.div>
             )}
@@ -605,89 +784,92 @@ const WorldBestPartForm = ({ onSubmit, onCancel, title, initialData = null }) =>
             {/* Step 5: Files */}
             {currentStep === 5 && (
               <motion.div
-                key="step5"
-                initial={{ opacity: 0, x: 50 }}
+                initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
                 className="space-y-6"
               >
-                <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-white mb-2">Assets & Files</h3>
-                  <p className="text-slate-400">Add images and documentation</p>
+                <div className="text-center space-y-2">
+                  <h3 className="text-xl font-semibold text-gray-800">Assets & Files</h3>
+                  <p className="text-gray-600">Add images and documentation</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <Label className="text-slate-300 text-lg">Part Image</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label>Part Image</Label>
                     <PremiumFileUploader
-                      onFileSelect={setImageFile}
-                      initialFileUrl={formData.image_url}
                       fileType="image"
                       icon={ImageIcon}
+                      onFileSelect={setImageFile}
+                      initialFileUrl={formData.image_url}
                     />
                   </div>
-                  <div className="space-y-4">
-                    <Label className="text-slate-300 text-lg">CAD File</Label>
+                  
+                  <div className="space-y-2">
+                    <Label>CAD File</Label>
                     <PremiumFileUploader
+                      fileType="cad"
+                      icon={UploadCloud}
                       onFileSelect={setCadFile}
                       initialFileUrl={formData.cad_url}
-                      fileType="CAD file"
-                      icon={Building2}
                     />
                   </div>
                 </div>
               </motion.div>
             )}
-          </AnimatePresence>
+          </div>
 
           {/* Navigation Buttons */}
-          <div className="flex justify-between items-center pt-8 border-t border-slate-600/50 mt-8">
-            <div className="flex gap-3">
-              <Button 
-                type="button" 
-                variant="ghost" 
-                onClick={onCancel}
-                className="text-slate-400 hover:text-white"
-              >
-                Cancel
-              </Button>
+          <div className="flex items-center justify-between p-6 bg-gray-50 border-t">
+            <div className="flex items-center gap-2">
               {currentStep > 1 && (
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setCurrentStep(currentStep - 1)}
-                  className="border-slate-500/50 hover:border-slate-400"
+                  disabled={isSubmitting}
                 >
                   Previous
                 </Button>
               )}
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              
               {currentStep < steps.length ? (
-                <Button 
+                <Button
                   type="button"
                   onClick={() => setCurrentStep(currentStep + 1)}
-                  disabled={!isStepValid(currentStep)}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  disabled={!canProceedToNextStep || isSubmitting}
                 >
-                  Next Step
+                  Next
                 </Button>
               ) : (
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting || !isStepValid(currentStep)}
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 px-8"
+                <Button
+                  type="submit"
+                  disabled={!canProceedToNextStep || isSubmitting}
+                  className="bg-blue-600 hover:bg-blue-700"
                 >
-                  {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  {isSubmitting ? 'Creating...' : 'Create Part'}
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {initialData ? 'Updating...' : 'Creating...'}
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4 mr-2" />
+                      {initialData ? 'Update Part' : 'Create Part'}
+                    </>
+                  )}
                 </Button>
               )}
             </div>
           </div>
         </form>
-      </motion.div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
